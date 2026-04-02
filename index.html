@@ -1,12 +1,1570 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RockHound — Prospection PACA</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RockHound — Prospection PACA</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0f1a;color:#e8e0d0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* HEADER */
+header{background:linear-gradient(135deg,#1a1005,#0d2a1a);padding:7px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #b8903e;flex-shrink:0;gap:10px}
+.htitle h1{font-size:.87rem;font-weight:700;color:#f5e6c8}
+.htitle p{font-size:.6rem;color:#907050;margin-top:1px}
+.hbadges{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.hb{background:rgba(184,144,62,.18);border:1px solid #b8903e;color:#f5e6c8;font-size:.58rem;padding:1px 5px;border-radius:6px}
+#editBtn{padding:5px 12px;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;border:2px solid #b8903e;background:transparent;color:#b8903e;transition:all .2s;white-space:nowrap}
+#editBtn.on{background:#b8903e;color:#0f0a00}
+#editBtn:hover{background:#f0c840;border-color:#f0c840;color:#0f0a00}
+
+/* SPINNER BRGM */
+#editSpinner{display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:2000;background:#1a1005;border:2px solid #b8903e;border-radius:8px;padding:7px 14px;font-size:.72rem;color:#f0a828;gap:8px;align-items:center;pointer-events:none}
+.spin{width:14px;height:14px;border:2px solid #b8903e44;border-top-color:#b8903e;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* SPECIES SUGGESTIONS */
+.species-item{cursor:pointer;padding:2px 5px;border-radius:3px;font-size:.63rem;color:#bbb;font-style:italic;margin-bottom:1px;transition:background .15s}
+.species-item:hover{background:#1e2e3a;color:#56ccf2}
+
+/* EDIT HINT */
+#editHint{display:none;background:#2a1800;border-bottom:2px solid #b8903e;padding:5px 14px;font-size:.68rem;color:#f2994a;flex-shrink:0}
+#editHint.on{display:flex;align-items:center;gap:8px}
+
+/* LAYOUT */
+.main{display:flex;flex:1;overflow:hidden}
+#map{flex:1 1 0;min-width:0;position:relative}
+
+/* PANEL */
+.panel{width:370px;flex-shrink:0;background:#0c0c1a;border-left:2px solid #1e1e32;display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;border-bottom:2px solid #1e1e32;flex-shrink:0}
+.tab{flex:1;padding:6px 2px;font-size:.59rem;text-align:center;cursor:pointer;color:#555;border-right:1px solid #1e1e32;transition:all .2s;user-select:none}
+.tab:last-child{border-right:none}
+.tab.active{background:#181830;color:#f5e6c8;border-bottom:2px solid #b8903e}
+.tab:hover:not(.active){background:#141426;color:#aaa}
+.tc{display:none;flex:1;overflow-y:auto;padding:8px}
+.tc.active{display:block}
+.tc::-webkit-scrollbar{width:4px}
+.tc::-webkit-scrollbar-track{background:#0c0c1a}
+.tc::-webkit-scrollbar-thumb{background:#1e1e32;border-radius:3px}
+
+/* CARDS */
+.sh{font-size:.59rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#b8903e;margin:7px 0 4px;padding-bottom:3px;border-bottom:1px solid #2a2a3e}
+.sh:first-child{margin-top:0}
+.card{background:#181830;border:1px solid #1e1e32;border-radius:6px;padding:8px;margin-bottom:5px;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+.card:hover{border-color:#b8903e;background:#1c1c30}
+.card.custom{border-color:#2a3a55}
+.card.custom:hover{border-color:#56ccf2}
+.ch{display:flex;align-items:flex-start;gap:6px;margin-bottom:3px}
+.ci{font-size:1.05rem;flex-shrink:0}
+.ct{font-size:.74rem;font-weight:700;color:#f5e6c8;line-height:1.3}
+.cs{font-size:.58rem;color:#666;margin-top:1px}
+.cb{font-size:.68rem;color:#bbb;line-height:1.5;margin-top:2px}
+.coo{font-size:.57rem;color:#3a7a3a;font-family:monospace;background:#0a140a;padding:2px 5px;border-radius:3px;display:inline-block;margin:2px 0}
+.tag{display:inline-block;font-size:.55rem;padding:1px 4px;border-radius:5px;margin:1px 1px 3px 0;font-weight:600}
+.tf{background:#1a3a2e;color:#6fcf97;border:1px solid #2d5a3d}
+.tm{background:#3a2e1e;color:#f2994a;border:1px solid #5a4a2d}
+.tw{background:#3a1e1e;color:#eb5757;border:1px solid #5a2d2d}
+.tk{background:#1e2e3a;color:#56ccf2;border:1px solid #2d4a5a}
+.tg{background:#2a3a1e;color:#b8e994;border:1px solid #3d5a2d}
+.ts{background:#1e1e3a;color:#f0a828;border:1px solid #3a3a1e}
+.tv{background:#3a1a3a;color:#f06cf0;border:1px solid #5a2d5a}
+.mg{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px}
+.mi{background:#1e1e35;border:1px solid #2a2a45;border-radius:4px;padding:4px 5px;font-size:.59rem}
+.mi .mn{font-weight:700;color:#f0a828;font-size:.6rem}
+.mi .mf{color:#888;font-style:italic;font-size:.54rem}
+.mi .md{color:#aaa;font-size:.56rem;margin-top:1px}
+.sl{font-size:.63rem;color:#bbb;line-height:1.6;margin-top:3px;padding-left:9px}
+.sl li{margin-bottom:1px}
+.src{font-size:.55rem;color:#446;background:#08080f;padding:2px 5px;border-radius:3px;margin-top:3px;font-style:italic}
+.lc{background:#141426;border:1px solid #1e1e32;border-radius:6px;padding:7px;margin-bottom:6px}
+.lc h4{color:#b8903e;font-size:.63rem;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.lr{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.lr label{font-size:.66rem;color:#bbb;flex:1;cursor:pointer}
+.lr input[type=range]{width:55px;accent-color:#b8903e;cursor:pointer}
+.lr span{font-size:.58rem;color:#666;width:22px;text-align:right}
+.tog{width:30px;height:16px;background:#1e1e35;border-radius:8px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;border:none;outline:none}
+.tog.on{background:#b8903e}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .2s}
+.tog.on::after{left:16px}
+.ibox{font-size:.62rem;color:#777;background:#0c0c1a;border:1px solid #1a1a2e;border-radius:5px;padding:5px 7px;margin-bottom:6px;line-height:1.55}
+.rib{display:flex;gap:0;margin-bottom:6px;border-radius:5px;overflow:hidden;font-size:.59rem;font-weight:700}
+.rs{flex:1;text-align:center;padding:4px;cursor:pointer;border:none;outline:none;transition:filter .15s}
+.rs:hover{filter:brightness(1.2)}
+.r30s{background:#1a3a2e;color:#6fcf97}
+.r90s{background:#3a1e1e;color:#f2994a}
+.ralls{background:#1e1e32;color:#bb86fc}
+
+/* EDIT BTN ON CARD */
+.card-edit-btn{position:absolute;top:6px;right:6px;background:#1e1e35;border:1px solid #2a2a45;color:#888;font-size:.58rem;padding:2px 7px;border-radius:4px;cursor:pointer;opacity:0;transition:opacity .2s}
+.card:hover .card-edit-btn{opacity:1}
+.card-edit-btn:hover{background:#b8903e;color:#0f0a00;border-color:#b8903e}
+
+/* MAP LEGEND */
+.map-legend{position:absolute;bottom:26px;left:10px;z-index:1000;background:rgba(8,8,20,.94);border:1px solid #1e1e32;border-radius:6px;padding:6px 9px;font-size:.59rem}
+.lr2{display:flex;align-items:center;gap:5px;margin-bottom:2px}
+.ld{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.lsep{border-top:1px dashed #2a2a3e;margin:3px 0}
+
+/* EDIT MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#12121e;border:2px solid #b8903e;border-radius:10px;padding:20px;width:440px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:.92rem;color:#f0a828;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.modal h2 span{font-size:.65rem;color:#666;font-weight:400}
+.form-row{margin-bottom:10px}
+.form-row label{display:block;font-size:.67rem;color:#b8903e;margin-bottom:3px;font-weight:600}
+.form-row input,.form-row textarea,.form-row select{width:100%;background:#1a1a2e;border:1px solid #2a2a40;border-radius:5px;color:#e8e0d0;padding:6px 8px;font-size:.72rem;font-family:inherit;outline:none;transition:border-color .2s}
+.form-row input:focus,.form-row textarea:focus,.form-row select:focus{border-color:#b8903e}
+.form-row textarea{resize:vertical;min-height:60px}
+.form-row select option{background:#1a1a2e}
+.form-coords{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.modal-footer{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
+.btn{padding:6px 14px;border-radius:5px;font-size:.72rem;font-weight:700;cursor:pointer;border:none;transition:all .2s}
+.btn-primary{background:#b8903e;color:#0f0a00}
+.btn-primary:hover{background:#f0c840}
+.btn-secondary{background:#1e1e35;color:#bbb;border:1px solid #2a2a45}
+.btn-secondary:hover{background:#2a2a45;color:#f5e6c8}
+.btn-danger{background:#3a1e1e;color:#eb5757;border:1px solid #5a2d2d}
+.btn-danger:hover{background:#5a2d2d;color:#fff}
+.btn-success{background:#1a3a2e;color:#6fcf97;border:1px solid #2d5a3d}
+.btn-success:hover{background:#2d5a3d;color:#fff}
+
+/* EXPORT/IMPORT */
+.io-bar{display:flex;gap:6px;margin-bottom:7px;flex-wrap:wrap}
+.io-btn{padding:4px 10px;border-radius:5px;font-size:.63rem;font-weight:700;cursor:pointer;border:1px solid;transition:all .15s}
+.io-btn:hover{filter:brightness(1.2)}
+
+/* CUSTOM TYPE BADGE */
+.custom-badge{display:inline-block;background:#1e2e3a;border:1px solid #2d4a5a;color:#56ccf2;font-size:.57rem;padding:1px 5px;border-radius:4px;margin-left:4px;font-weight:600}
+
+/* POPUP */
+.leaflet-popup-content-wrapper{background:#181830!important;color:#e8e0d0!important;border:1px solid #b8903e!important;border-radius:8px!important;box-shadow:0 4px 20px rgba(0,0,0,.7)!important}
+.leaflet-popup-tip{background:#181830!important}
+.leaflet-popup-content{margin:9px 12px!important}
+.pt{font-size:.8rem;font-weight:700;color:#f0a828;margin-bottom:3px}
+.pb{font-size:.68rem;color:#bbb;line-height:1.5}
+.pc{font-size:.57rem;color:#3a7a3a;font-family:monospace;background:#0a140a;padding:2px 5px;border-radius:3px;display:inline-block;margin-top:3px}
+.ppop-btns{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+.ppop-btn{padding:2px 8px;font-size:.63rem;font-weight:700;border-radius:4px;cursor:pointer;border:none}
+.ppop-edit{background:#b8903e;color:#0f0a00}
+.ppop-del{background:#3a1e1e;color:#eb5757;border:1px solid #5a2d2d}
+.ppop-tab{background:#1e2e3a;color:#56ccf2}
+
+/* ADD ZONE TOOLTIP */
+#addZoneBar{display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:2000;background:#2a1800;border:2px solid #f2994a;border-radius:7px;padding:7px 14px;font-size:.72rem;color:#f2994a;text-align:center;pointer-events:none}
+
+.counter{display:inline-block;background:#b8903e22;border:1px solid #b8903e44;color:#f0a828;font-size:.62rem;padding:1px 6px;border-radius:9px;margin-left:4px}
+</style>
 </head>
 <body>
-  <h1>🪨 RockHound — Prospection PACA v1</h1>
-  <p>Déploiement en cours...</p>
+
+<header>
+  <div class="htitle">
+    <h1>🪨 RockHound — Prospection PACA <span style="color:#b8903e">v1</span></h1>
+    <p>Fossiles · Minéraux · Mines · BRGM · IGN · <span style="color:#56ccf2">Éditeur intégré</span></p>
+  </div>
+  <div class="hbadges">
+    <span class="hb" id="site-count">26 sites</span>
+    <span class="hb">GPS précis</span>
+    <span class="hb">WMS BRGM</span>
+  </div>
+  <button id="editBtn" onclick="toggleEdit()">✏️ Mode édition</button>
+</header>
+
+<div id="editHint">
+  <span>🖱️</span>
+  <span>Cliquez sur la carte pour ajouter un site · Cliquez sur un marqueur existant pour le modifier · <b>Shift+clic</b> pour supprimer rapidement</span>
+</div>
+
+<div class="main">
+  <div id="map">
+    <div class="map-legend">
+      <div class="lr2"><div class="ld" style="background:#22c55e"></div>Pliocène</div>
+      <div class="lr2"><div class="ld" style="background:#a3e635"></div>Miocène / Jura</div>
+      <div class="lr2"><div class="ld" style="background:#84cc16"></div>Fossiles Méso. ≤30min</div>
+      <div class="lr2"><div class="ld" style="background:#f59e0b"></div>Mines ≤30 min</div>
+      <div class="lr2"><div class="ld" style="background:#ec4899"></div>Volcanique</div>
+      <div class="lsep"></div>
+      <div class="lr2"><div class="ld" style="background:#3b82f6"></div>Fossiles ≤1h30</div>
+      <div class="lr2"><div class="ld" style="background:#a855f7"></div>Mines ≤1h30</div>
+      <div class="lr2"><div class="ld" style="background:#56ccf2;border:1px dashed #2d4a5a"></div>Sites personnalisés</div>
+    </div>
+    <div id="addZoneBar">Dessinez la zone en cliquant les sommets · Double-clic pour terminer</div>
+    <div id="editSpinner"><div class="spin"></div>Interrogation BRGM…</div>
+  </div>
+
+  <div class="panel">
+    <div class="tabs">
+      <div class="tab active" onclick="sT('layers')">🗺️ Couches</div>
+      <div class="tab" onclick="sT('plio')">🐚 Cénoz.</div>
+      <div class="tab" onclick="sT('meso')">🐙 Méso.</div>
+      <div class="tab" onclick="sT('mines')">⛏️ Mines</div>
+      <div class="tab" onclick="sT('custom')">📍 Mes sites</div>
+      <div class="tab" onclick="sT('legend')">📖 Légende</div>
+    </div>
+
+    <!-- COUCHES -->
+    <div class="tc active" id="tc-layers">
+      <div class="lc"><h4>Fonds de carte</h4>
+        <div class="lr"><button class="tog on" id="btn-ign" onclick="tl('ign')"></button><label onclick="tl('ign')">IGN Plan V2</label></div>
+        <div class="lr"><button class="tog on" id="btn-osm" onclick="tl('osm')"></button><label onclick="tl('osm')">OpenStreetMap</label></div>
+        <div class="lr"><button class="tog" id="btn-sat" onclick="tl('sat')"></button><label onclick="tl('sat')">IGN Orthophoto</label></div>
+      </div>
+      <div class="lc"><h4>Géologie BRGM <span style="font-size:.55rem;color:#557;font-weight:400">(geoservices.brgm.fr/geologie)</span></h4>
+        <div class="lr"><button class="tog on" id="btn-brgm" onclick="tl('brgm')"></button><label onclick="tl('brgm')">Unités géologiques <span style="color:#557;font-size:.57rem">(BD-CHARM-50, 1:50 000)</span></label><input type="range" min="0" max="100" value="55" oninput="sO('brgm',this.value)"><span id="sp-brgm">55%</span></div>
+        <div class="lr"><button class="tog" id="btn-litho" onclick="tl('litho')"></button><label onclick="tl('litho')">Lithologie simplifiée <span style="color:#557;font-size:.57rem">(1:1 000 000)</span></label><input type="range" min="0" max="100" value="60" oninput="sO('litho',this.value)"><span id="sp-litho">60%</span></div>
+        <div class="lr"><button class="tog" id="btn-fault" onclick="tl('fault')"></button><label onclick="tl('fault')">Scan géologique <span style="color:#557;font-size:.57rem">(1:50 000 · failles · zoom ≥11)</span></label></div>
+        <div class="lr"><button class="tog" id="btn-struct" onclick="tl('struct')"></button><label onclick="tl('struct')">Carte harmonisée <span style="color:#557;font-size:.57rem">(1:50 000 · zoom ≥10)</span></label></div>
+      </div>
+      <div class="lc"><h4>Marqueurs</h4>
+        <div class="lr"><button class="tog on" id="btn-mp" onclick="tM('p')"></button><label><span style="color:#22c55e">●</span> Pliocène</label></div>
+        <div class="lr"><button class="tog on" id="btn-mmi" onclick="tM('mi')"></button><label><span style="color:#a3e635">●</span> Miocène / Courmettes</label></div>
+        <div class="lr"><button class="tog on" id="btn-mf30" onclick="tM('f30')"></button><label><span style="color:#84cc16">●</span> Fossiles Méso. ≤30 min</label></div>
+        <div class="lr"><button class="tog on" id="btn-mf90" onclick="tM('f90')"></button><label><span style="color:#3b82f6">●</span> Fossiles Méso. ≤1h30</label></div>
+        <div class="lr"><button class="tog on" id="btn-mm30" onclick="tM('m30')"></button><label><span style="color:#f59e0b">●</span> Mines ≤30 min</label></div>
+        <div class="lr"><button class="tog on" id="btn-mm90" onclick="tM('m90')"></button><label><span style="color:#a855f7">●</span> Mines ≤1h30</label></div>
+        <div class="lr"><button class="tog on" id="btn-mvol" onclick="tM('vol')"></button><label><span style="color:#ec4899">●</span> Volcaniques</label></div>
+        <div class="lr"><button class="tog on" id="btn-mcustom" onclick="tM('custom')"></button><label><span style="color:#56ccf2">●</span> Sites personnalisés</label></div>
+        <div class="lr"><button class="tog on" id="btn-mz" onclick="tM('z')"></button><label>Zones géologiques</label></div>
+      </div>
+      <div class="ibox">💡 <b>26+ sites</b> · Sources : Mindat (IDs 6914/55448/1672/32050/251822), GéositesAlpesAzur, CEN-PACA, BRGM, Bolle O. (2008/2009). Coordonnées GPS validées dont Roua : 44.03037°N 6.86773°E.</div>
+    </div>
+
+    <!-- CENOZOIQUE -->
+    <div class="tc" id="tc-plio">
+      <div class="rib">
+        <button class="rs r30s" onclick="fF('plio',30)">≤ 30 min</button>
+        <button class="rs r90s" onclick="fF('plio',90)">≤ 1h30</button>
+        <button class="rs ralls" onclick="fF('plio',0)">Tout</button>
+      </div>
+      <!-- cards générées dynamiquement -->
+      <div id="list-plio"></div>
+    </div>
+
+    <!-- MESOZOIQUE -->
+    <div class="tc" id="tc-meso">
+      <div class="rib">
+        <button class="rs r30s" onclick="fF('meso',30)">≤ 30 min</button>
+        <button class="rs r90s" onclick="fF('meso',90)">≤ 1h30</button>
+        <button class="rs ralls" onclick="fF('meso',0)">Tout</button>
+      </div>
+      <div id="list-meso"></div>
+    </div>
+
+    <!-- MINES -->
+    <div class="tc" id="tc-mines">
+      <div class="rib">
+        <button class="rs r30s" onclick="fF('mines',30)">≤ 30 min</button>
+        <button class="rs r90s" onclick="fF('mines',90)">≤ 1h30</button>
+        <button class="rs ralls" onclick="fF('mines',0)">Tout</button>
+      </div>
+      <div id="list-mines"></div>
+    </div>
+
+    <!-- MES SITES (custom) -->
+    <div class="tc" id="tc-custom">
+      <div class="ibox">📍 Sites ajoutés par vous. Sauvegardés dans le navigateur (localStorage). Utilisez Import/Export JSON pour sauvegarder ou partager vos données.</div>
+      <div class="io-bar">
+        <button class="io-btn" style="border-color:#b8903e;color:#b8903e" onclick="exportJSON()">⬇️ Exporter JSON</button>
+        <button class="io-btn" style="border-color:#56ccf2;color:#56ccf2" onclick="document.getElementById('importFile').click()">⬆️ Importer JSON</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+        <button class="io-btn" style="border-color:#eb5757;color:#eb5757" onclick="confirmClearCustom()">🗑️ Tout effacer</button>
+      </div>
+      <div id="list-custom"><div class="ibox" style="color:#555;text-align:center">Aucun site personnalisé.<br>Activez le mode édition ✏️ puis cliquez sur la carte.</div></div>
+    </div>
+
+  </div><!-- /panel -->
+
+  <!-- TAB LÉGENDE -->
+  <!-- inséré dans le panel, mais placé après pour éviter le double fermeture -->
+</div><!-- /main -->
+
+<script>
+// Injection du tab légende dans le panel après chargement DOM
+(function(){
+  const panel=document.querySelector('.panel');
+  const legend=document.createElement('div');
+  legend.className='tc';
+  legend.id='tc-legend';
+  legend.innerHTML=`
+<style>
+.leg-section{margin-bottom:10px}
+.leg-h{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#b8903e;padding:5px 0 4px;border-bottom:1px solid #2a2a3e;margin-bottom:6px}
+.leg-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px}
+.leg-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0;margin-top:2px}
+.leg-sq{width:14px;height:14px;flex-shrink:0;margin-top:2px;border-radius:2px}
+.leg-line{width:22px;height:6px;flex-shrink:0;margin-top:6px;border-radius:1px}
+.leg-text{font-size:.69rem;color:#ccc;line-height:1.5}
+.leg-text b{color:#f5e6c8}
+.leg-text small{font-size:.61rem;color:#777;display:block;margin-top:1px}
+.leg-badge{display:inline-block;font-size:.57rem;padding:1px 5px;border-radius:4px;font-weight:600;margin-right:3px;vertical-align:middle}
+.lbf{background:#1a3a2e;color:#6fcf97;border:1px solid #2d5a3d}
+.lbm{background:#3a2e1e;color:#f2994a;border:1px solid #5a4a2d}
+.lbw{background:#3a1e1e;color:#eb5757;border:1px solid #5a2d2d}
+.strat-table{width:100%;border-collapse:collapse;font-size:.64rem;margin-top:4px}
+.strat-table th{background:#141426;color:#b8903e;padding:4px 6px;text-align:left;font-weight:700;font-size:.6rem;border-bottom:1px solid #2a2a3e}
+.strat-table td{padding:4px 6px;border-bottom:1px solid #181830;vertical-align:top;color:#bbb}
+.strat-table tr:hover td{background:#161626}
+.strat-table .age-col{font-family:monospace;color:#888;white-space:nowrap;font-size:.6rem}
+.strat-table .era-cell{font-weight:700;color:#f0a828}
+.leg-notice{background:#0d0d1a;border:1px solid #2a2a3e;border-radius:5px;padding:7px 9px;margin-bottom:5px;font-size:.67rem;color:#bbb;line-height:1.6}
+.leg-notice .notice-title{font-weight:700;color:#f0a828;margin-bottom:3px;font-size:.69rem}
+.brgm-color{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:middle;margin-right:4px;border:1px solid rgba(255,255,255,.1)}
+.reg-row{display:flex;align-items:flex-start;gap:7px;margin-bottom:5px;padding:4px 6px;background:#0e0e1c;border-radius:5px}
+.reg-icon{font-size:1rem;flex-shrink:0;line-height:1}
+.reg-text{font-size:.67rem;color:#bbb;line-height:1.55}
+.reg-text b{color:#f5e6c8}
+.biblio-entry{font-size:.64rem;color:#888;line-height:1.6;padding:2px 0;border-bottom:1px dashed #181830}
+.biblio-entry b{color:#b8903e}
+.dist-ring{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.dist-ring .ring{width:16px;height:16px;border-radius:50%;flex-shrink:0;border:2px dashed}
+</style>
+
+<!-- MARQUEURS FOSSILES -->
+<div class="leg-section">
+  <div class="leg-h">🐙 Marqueurs — Sites fossilifères</div>
+
+  <div class="leg-row">
+    <div class="leg-dot" style="background:#22c55e"></div>
+    <div class="leg-text"><b>🐚 Pliocène — Coquillages marins</b>
+    <small>Bassin du Var (triangle SMV–Cagnes–Nice). Marnes bleues Zancléen et Poudingues du delta. Gastéropodes, bivalves, scaphopodes (~3,5–5,3 Ma). 150+ espèces décrites. 200–300 coquilles/demi-journée. Source : O. Bolle (2008/2009).</small></div>
+  </div>
+
+  <div class="leg-row">
+    <div class="leg-dot" style="background:#a3e635"></div>
+    <div class="leg-text"><b>🦪 Miocène / Jura-Crétacé — Préalpes d'Azur</b>
+    <small>Mollasse burdigalienne à Pectens et Clypeaster (Lauves de Tourrettes-sur-Loup, ~23 Ma) + Gîte fossilifère des Courmettes (Jura–Crétacé, 80–220 Ma). Source : CEN-PACA, GéositesAlpesAzur.</small></div>
+  </div>
+
+  <div class="leg-row">
+    <div class="leg-dot" style="background:#84cc16"></div>
+    <div class="leg-text"><b>🐙 Fossiles mésozoïques ≤ 30 min de Nice</b>
+    <small>Col de Braus (1 200 m coupe Jura–Crétacé · patrimoine géologique mondial), Pont-de-Peille/Fontanil (Albien ~100 Ma · <i>Mariella, Stoliczkaia</i>), Bord du Var D6202 (Oxfordien ~160 Ma · <i>Perisphinctes</i>), Gorges Vésubie D2565 (Callovien-Oxfordien · <i>Macrocephalites</i>).</small></div>
+  </div>
+
+  <div class="leg-row">
+    <div class="leg-dot" style="background:#3b82f6"></div>
+    <div class="leg-text"><b>🐙 Fossiles mésozoïques ≤ 1h30 de Nice</b>
+    <small>Peyroules (Hauterivien ~130 Ma · bélemnites · O. Bolle 2009), Barrême (stratotype Barrémien 1862 · <i>Emericiceras</i> · ⚠️ RNGHP), Arc Castellane/Senez (Jura–Crétacé · ⚠️ RNGHP), Saint-Auban/Logis du Pin (Jurassique · faune complète), Site des Siréniens / Col des Lèques (Éocène ~40 Ma · <i>Halitherium</i> · ⚠️ RNGHP).</small></div>
+  </div>
+</div>
+
+<!-- MARQUEURS MINES -->
+<div class="leg-section">
+  <div class="leg-h">⛏️ Marqueurs — Mines & Minéraux</div>
+
+  <div class="leg-row">
+    <div class="leg-dot" style="background:#f59e0b"></div>
+    <div class="leg-text"><b>⛏️ / 🪨 Mines & Minéraux ≤ 30 min</b>
+    <small><b>Mine de l'Éguisse (Duranus)</b> — Réalgar, Duranusite (localité type mondiale), Orpiment, Picropharmacolite. Galeries interdites, haldes libres. <b>Lucéram (Roccaniéra)</b> — Orpiment, Talmessite (1ère France). <b>Gypse triasique (Col de Brouis)</b> — Sélénite, Anhydrite. <b>Andésites (Biot/VL)</b> — Labradorite.</small></div>
+  </div>
+
+  <div class="leg-row">
+    <div class="leg-dot" style="background:#a855f7"></div>
+    <div class="leg-text"><b>💎 Mines ≤ 1h30</b>
+    <small><b>Mines de Roua (Gorges de Daluis, 44.03037°N 6.86773°E)</b> — 9 nouvelles espèces mondiales, cuivre natif protohistorique. RNR : observation uniquement. <b>Léouvé/Le Cerisier</b> — Azurite, malachite, bornite. Musée du Cuivre. <b>Vallauria (Tende)</b> — Galène, sphalérite. VISITABLE. <b>Vallon de Merlier (Isola)</b> — Ménéghinite (1ère France), galène. Alt. 2 200 m. <b>Fontsante (Tanneron)</b> — Fluorite ≤10 cm, proustite. Haldes libres.</small></div>
+  </div>
+
+  <div class="leg-row">
+    <div class="leg-dot" style="background:#ec4899"></div>
+    <div class="leg-text"><b>🌋 Sites volcaniques</b>
+    <small>Andésites oligocènes de Biot/Villeneuve-Loubet (~31 Ma, 26 Ma, GéositesAlpesAzur #29). Volcan de Maure-Vieil – Mandelieu (méga-caldeira éteinte, GéositesAlpesAzur #30). Contexte : rifting tardi-oligocène lié au détachement lithosphérique alpin.</small></div>
+  </div>
+
+  <div class="leg-row">
+    <div class="leg-dot" style="background:#56ccf2;border:1px dashed #2d4a5a"></div>
+    <div class="leg-text"><b>📍 Sites personnalisés</b>
+    <small>Sites ajoutés en mode édition. Sauvegardés dans le navigateur (localStorage). Exportables en JSON.</small></div>
+  </div>
+</div>
+
+<!-- ZONES GEOGRAPHIQUES -->
+<div class="leg-section">
+  <div class="leg-h">🗺️ Zones géologiques (polygones)</div>
+  <div class="leg-row"><div class="leg-sq" style="background:#22c55e;opacity:.5"></div>
+    <div class="leg-text"><b>Bassin pliocène du Var</b> — Triangle SMV / Cagnes / Nice. Marnes bleues + Poudingues.<br><b>Arc Castellane / RNGHP</b> — Stratotype Barrémien. Peyroules. Site Siréniens.</div>
+  </div>
+  <div class="leg-row"><div class="leg-sq" style="background:#3b82f6;opacity:.5"></div>
+    <div class="leg-text"><b>Zone oxfordienne transitionnelle</b> — Marnes à Perisphinctes, Euaspidoceras. D6202.</div>
+  </div>
+  <div class="leg-row"><div class="leg-sq" style="background:#ef4444;opacity:.5"></div>
+    <div class="leg-text"><b>Crétacé inférieur</b> — Col de Braus (coupe 1 200 m, patrimoine mondial). Albien Fontanil.</div>
+  </div>
+  <div class="leg-row"><div class="leg-sq" style="background:#f59e0b;opacity:.5"></div>
+    <div class="leg-text"><b>Zone arsenicale Duranus–Lucéram</b> — Filonnets calcite-réalgar dans Cénomanien basal.<br><b>Mines de Roua + Léouvé</b> — Cuivre natif protohistorique dans pélites permiennes.</div>
+  </div>
+  <div class="leg-row"><div class="leg-sq" style="background:#a855f7;opacity:.5"></div>
+    <div class="leg-text"><b>Fontsante (Tanneron)</b> — 20 filons de fluorite CaF₂ dans les gneiss. Référence mondiale.</div>
+  </div>
+  <div class="dist-ring">
+    <div class="ring" style="background:rgba(34,197,94,.1);border-color:#22c55e"></div>
+    <span class="leg-text">Rayon ~30 min de Nice</span>
+  </div>
+  <div class="dist-ring">
+    <div class="ring" style="background:rgba(242,153,74,.08);border-color:#f2994a"></div>
+    <span class="leg-text">Rayon ~1h30 de Nice</span>
+  </div>
+</div>
+
+<!-- COUCHES BRGM -->
+<div class="leg-section">
+  <div class="leg-h">🗺️ Notice des couches WMS BRGM</div>
+
+  <div class="leg-notice">
+    <div class="notice-title">Unités géologiques 1/50 000 <code style="background:#1e1e35;padding:1px 4px;border-radius:3px;font-size:.58rem;color:#557">GEOLOGIE</code></div>
+    Carte géologique officielle BD-CHARM-50. Seul nom de couche WMS documenté pour les unités géologiques colorées. Visible à tous les zooms. Chaque couleur = une formation/étage BRGM. Le symbole <b>×</b> marque un gîte fossilifère connu. Source : <code>geoservices.brgm.fr/geologie</code> — couche <b>GEOLOGIE</b>.
+  </div>
+
+  <div class="leg-notice">
+    <div class="notice-title">Lithologie simplifiée 1/1 000 000 <code style="background:#1e1e35;padding:1px 4px;border-radius:3px;font-size:.58rem;color:#557">LITHO_1M_SIMPLIFIEE</code></div>
+    <b>Vrai nom</b> issu du GetCapabilities BRGM. Représente les roches dominantes du sous-sol à l'échelle du 1/1 000 000. Distingue calcaires, marnes, grès, granites, gneiss… Sans rapport de zoom limitant (visible à toutes les échelles). Utile pour identifier rapidement si une zone est propice aux fossiles (marnes = favorable) ou aux minéraux filoniens (socle cristallin). <b style="color:#eb5757">⚠️ LITHOSTRATIGRAPHIE n'existe pas</b> comme couche dans ce WMS.
+  </div>
+
+  <div class="leg-notice">
+    <div class="notice-title">Scan géologique 1/50 000 · Failles incluses <code style="background:#1e1e35;padding:1px 4px;border-radius:3px;font-size:.58rem;color:#557">SCAN_D_GEOL50</code></div>
+    Scan numérique de la carte papier au 1/50 000. <b>Les failles ne sont pas une couche WMS séparée dans ce service.</b> Elles sont intégrées comme figurés symboliques dans cette couche image, visible à partir du zoom 11. Pour télécharger les failles en vecteur (WFS), utiliser <code>geoservices.brgm.fr/geologie?SERVICE=WFS</code> — couche <b>SCAN_H_FAILLE</b> (SIG local uniquement, non compatible CORS navigateur). <b style="color:#eb5757">⚠️ FAILLES n'existe pas</b> comme couche WMS indépendante.
+  </div>
+
+  <div class="leg-notice">
+    <div class="notice-title">Carte harmonisée 1/50 000 <code style="background:#1e1e35;padding:1px 4px;border-radius:3px;font-size:.58rem;color:#557">SCAN_H_GEOL50_SCAN</code></div>
+    Version harmonisée (multi-feuilles assemblées) de la carte géologique 1/50 000. Affiche formations géologiques + éléments structuraux linéaires (contacts, chevauchements, failles principales) dans un style homogène. Zoom ≥10 requis. Source : BD harm-50 BRGM.
+  </div>
+
+  <div class="leg-notice">
+    <div class="notice-title">Lithostratigraphie RGF — service séparé</div>
+    La carte lithostratigraphique (unités lithostratigraphiques RGF avec hiérarchie supergroupe/groupe/formation) est accessible via un service <b>complètement différent</b> : <code>http://mapsref.brgm.fr/wxs/maps/sigeol</code>. Ce service est en HTTP (pas HTTPS) et peut être bloqué par certains navigateurs. Pour l'utiliser dans QGIS, ajouter directement cette URL WMS.
+  </div>
+
+  <div class="leg-notice">
+    <div class="notice-title">IGN Plan V2</div>
+    Fond topographique officiel de l'IGN. Affiche les routes, sentiers, courbes de niveau, noms de lieu. Essentiel pour la navigation vers les affleurements. Utiliser le zoom 14+ pour voir les chemins de randonnée et sentiers d'accès.
+  </div>
+
+  <div class="leg-notice">
+    <div class="notice-title">IGN Orthophoto</div>
+    Photographie aérienne verticale orthorectifiée. Permet de repérer les haldes de mines, les couleurs de terrain caractéristiques (pélites rouges permiennes, marnes bleues), les accès carrossables et les affleurements visibles depuis le ciel.
+  </div>
+</div>
+
+<!-- COLONNE STRATIGRAPHIQUE REGIONALE -->
+<div class="leg-section">
+  <div class="leg-h">📐 Colonne stratigraphique régionale</div>
+  <table class="strat-table">
+    <tr><th>Ère / Époque</th><th>Âge (Ma)</th><th>Étage</th><th>Faune / Minéraux clés</th></tr>
+    <tr>
+      <td class="era-cell" rowspan="3">Cénozoïque</td>
+      <td class="age-col">~40</td><td>Éocène</td><td>Halitherium (siréniens) — Col des Lèques</td>
+    </tr>
+    <tr>
+      <td class="age-col">~23</td><td>Burdigalien</td><td>Pecten, Clypeaster — Lauves de Tourrettes</td>
+    </tr>
+    <tr>
+      <td class="age-col">3,5–5,3</td><td>Zancléen–Plaisancien</td><td>150+ espèces mollusques — Bassin du Var (O. Bolle)</td>
+    </tr>
+    <tr>
+      <td class="era-cell" rowspan="6">Mésozoïque — Crétacé</td>
+      <td class="age-col">~100</td><td>Albien terminal</td><td>Mariella, Stoliczkaia — Fontanil (Delanoy 1988)</td>
+    </tr>
+    <tr>
+      <td class="age-col">~113–117</td><td>Barrémien</td><td>Emericiceras, Crioceratites — Barrême (stratotype 1862)</td>
+    </tr>
+    <tr>
+      <td class="age-col">~121–126</td><td>Aptien</td><td>Ammonites déroulées — Col de Braus</td>
+    </tr>
+    <tr>
+      <td class="age-col">~127–132</td><td>Barrémien–Hauterivien</td><td>Duvalia gr. dilatata — Peyroules (O. Bolle 2009)</td>
+    </tr>
+    <tr>
+      <td class="age-col">~130</td><td>Hauterivien</td><td>Marnes à bélemnites — Peyroules</td>
+    </tr>
+    <tr>
+      <td class="age-col">~100</td><td>Cénomanien basal</td><td>Filons réalgar-calcite — Duranus, Lucéram</td>
+    </tr>
+    <tr>
+      <td class="era-cell" rowspan="4">Mésozoïque — Jurassique</td>
+      <td class="age-col">~155–165</td><td>Oxfordien moyen</td><td>Perisphinctes, Euaspidoceras — D6202 du Var</td>
+    </tr>
+    <tr>
+      <td class="age-col">~160–165</td><td>Callovien</td><td>Macrocephalites, Choffatia — Gorges Vésubie</td>
+    </tr>
+    <tr>
+      <td class="age-col">~130–150</td><td>Jura moyen/sup.</td><td>Faune complète — Saint-Auban / Logis du Pin</td>
+    </tr>
+    <tr>
+      <td class="age-col">~195–200</td><td>Sinémurien</td><td>Coroniceras (≤70 cm) — Dalle aux Ammonites, Digne</td>
+    </tr>
+    <tr>
+      <td class="era-cell" rowspan="2">Paléozoïque — Permien</td>
+      <td class="age-col">~270–298</td><td>Permien sup.</td><td>Pélites rouges — hôte des mines de cuivre de Roua (Dôme de Barrot)</td>
+    </tr>
+    <tr>
+      <td class="age-col">~252–270</td><td>Trias inf.</td><td>Conglomérats Cu — Mine de Léouvé (Trias inf., loc-55448)</td>
+    </tr>
+    <tr>
+      <td class="era-cell">Socle cristallin</td>
+      <td class="age-col">300–400</td><td>Varisque</td><td>Embréchites Argentera-Mercantour — Vallauria (Pb-Zn), Merlier (ménéghinite)</td>
+    </tr>
+  </table>
+</div>
+
+<!-- RÉGLEMENTATION -->
+<div class="leg-section">
+  <div class="leg-h">⚖️ Réglementation essentielle</div>
+
+  <div class="reg-row">
+    <div class="reg-icon">🟥</div>
+    <div class="reg-text"><b>RNGHP — Réserve Naturelle Géologique de Haute-Provence</b> (230 000 ha, la plus grande d'Europe)<br>Couvre : Barrême, Senez, Peyroules, Col des Lèques (Site des Siréniens), La Robine (ichtyosaures), Digne (Dalle aux ammonites).<br><span class="leg-badge lbw">Extraction interdite</span> <span class="leg-badge lbf">Ramassage surface toléré en petite quantité</span></div>
+  </div>
+
+  <div class="reg-row">
+    <div class="reg-icon">🟥</div>
+    <div class="reg-text"><b>RNR Gorges de Daluis</b> — Mines de Roua (depuis 2012, 1 082 ha)<br><span class="leg-badge lbw">Collecte minérale strictement interdite</span> <span class="leg-badge lbf">Observation et photo uniquement</span></div>
+  </div>
+
+  <div class="reg-row">
+    <div class="reg-icon">🟧</div>
+    <div class="reg-text"><b>Parc National du Mercantour</b><br>Mine de Vallauria en lisière, Vallon de Merlier à l'intérieur.<br><span class="leg-badge lbw">Extraction interdite dans le cœur</span></div>
+  </div>
+
+  <div class="reg-row">
+    <div class="reg-icon">🟨</div>
+    <div class="reg-text"><b>Mine de l'Éguisse (Duranus)</b><br>Arrêté municipal du 14/09/1992 — galeries interdites.<br><span class="leg-badge lbf">Haldes extérieures librement accessibles</span></div>
+  </div>
+
+  <div class="reg-row">
+    <div class="reg-icon">🟨</div>
+    <div class="reg-text"><b>ENS Lauves de Tourrettes-sur-Loup</b> (CEN-PACA)<br><span class="leg-badge lbw">Rester sur les sentiers balisés</span></div>
+  </div>
+
+  <div class="reg-row">
+    <div class="reg-icon">☢️</div>
+    <div class="reg-text"><b>Minéraux arsenicaux</b> — Réalgar (AsS), Orpiment (As₂S₃), Duranusite (As₄S) : <b>toxiques</b>.<br>Gants obligatoires · Laver les mains · Stocker hermétiquement · Éloigner des enfants et animaux. Ne jamais inhaler la poussière lors de la découpe.</div>
+  </div>
+
+  <div class="reg-row">
+    <div class="reg-icon">🔥</div>
+    <div class="reg-text"><b>Mine de Fontsante (Tanneron)</b><br>Zone à risque incendie. En été : vérifier l'arrêté préfectoral de restriction de circulation avant de s'y rendre.</div>
+  </div>
+
+  <div class="reg-row">
+    <div class="reg-icon">🏔️</div>
+    <div class="reg-text"><b>Vallon de Merlier (Isola)</b><br>Alt. 2 200–2 300 m. Accessible uniquement de <b>juin à octobre</b> selon l'enneigement. Pas de chemin balisé au-delà de la Vacherie de Chastillon.</div>
+  </div>
+</div>
+
+<!-- BIBLIOGRAPHIE -->
+<div class="leg-section">
+  <div class="leg-h">📚 Sources bibliographiques</div>
+
+  <div class="biblio-entry"><b>O. Bolle</b> — paleomaniac.over-blog.com — Articles Sud-Est France (2008, 2009) : Pliocène de Nice, Hauterivien de Peyroules.</div>
+  <div class="biblio-entry"><b>Mindat.org</b> — Hudson Institute of Mineralogy — loc-6914 (Roua), loc-1672 (Éguisse), loc-55448 (Léouvé), loc-32050 (Fontsante), loc-251822 (Vallauria).</div>
+  <div class="biblio-entry"><b>GéositesAlpesAzur</b> — geositesalpesazur.com — 30 sites remarquables des Alpes-Maritimes. Sites #16 (Courmettes), #17 (Lauves/Pectens), #29 (Biot volcanique), #30 (Maure-Vieil caldeira).</div>
+  <div class="biblio-entry"><b>CEN-PACA</b> (2023) — Les Lauves de Tourrettes-sur-Loup, ENS.</div>
+  <div class="biblio-entry"><b>BRGM</b> — Notices feuilles 0972N (Roquesteron) et 0999N (Grasse-Cannes). infoterre.brgm.fr</div>
+  <div class="biblio-entry"><b>Mari D. & Mari G.</b> (1982) — Mines et Minéraux des Alpes-Maritimes. Éd. Serre, Nice.</div>
+  <div class="biblio-entry"><b>Perroud P.</b> (1989) — Les minéraux de Duranus. Le Cristallier Suisse, 8(5), 216–230.</div>
+  <div class="biblio-entry"><b>Johan Z. et al.</b> (1973) — La duranusite. Bull. Minéral., 96, 131–134.</div>
+  <div class="biblio-entry"><b>Pierrot R. et al.</b> (1974) — Inventaire minéralogique France n°4 : Alpes-Maritimes. BRGM.</div>
+  <div class="biblio-entry"><b>Aicard P. et al.</b> (1968) — Ménéghinite à Merlier. Bull. Soc. fr. Minéral. Cristallogr., 91, 497–499.</div>
+  <div class="biblio-entry"><b>Feraud J. et al.</b> (1976) — Talmessite à Lucéram. Bull. Soc. fr. Minéral. Cristallogr., 99, 331–333.</div>
+  <div class="biblio-entry"><b>Sarp H., Černý R.</b> (1999) — Gilmarite. Eur. J. Mineral., 11, 549–556.</div>
+  <div class="biblio-entry"><b>Sarp H., Mari G.</b> (1999) — Wallkilldellite-(Fe). Riviéra Scientifique, 12, 5–12.</div>
+  <div class="biblio-entry"><b>Wilson F.A.</b> (1977) — Fluorite from Font Sante Mine. Mineralogical Record, 8(4), 308–311.</div>
+  <div class="biblio-entry"><b>Delanoy G. & Latil J.-L.</b> (1988) — Ammonites albiennes à Drap. Géobios, 21(6).</div>
+  <div class="biblio-entry"><b>ResearchGate</b> (2010) — Col de Braus: Historical Geological Locality with High Geoheritage Value.</div>
+  <div class="biblio-entry"><b>Dardeau G. & Marchand D.</b> (1982) — L'Oxfordien dans les Alpes-Maritimes. Géol. Médit., IX(1), 43–50.</div>
+  <div class="biblio-entry"><b>Belot V.R.</b> (1978) — Guide des minéraux, coquillages et fossiles : où les trouver en France. Éd. Horay.</div>
+  <div style="font-size:.59rem;color:#446;margin-top:5px;line-height:1.5">Toutes les coordonnées GPS sont extraites directement de Mindat.org ou de la carte BRGM/Infoterre et validées sur Google Earth. La précision est de ±10–50 m selon la source. Roua : 44.03037°N 6.86773°E (source : Mindat ID 6914, cadre coordonnées).</div>
+</div>
+  `;
+  panel.appendChild(legend);
+})();
+</script>
+
+<div class="modal-overlay" id="modalOverlay" onclick="modalClickOutside(event)">
+  <div class="modal" id="modal">
+    <h2 id="modalTitle">✏️ Ajouter un site <span id="modalCoordDisplay"></span></h2>
+    <div class="form-row">
+      <label>Icône & Nom du site</label>
+      <div style="display:grid;grid-template-columns:80px 1fr;gap:8px">
+        <select id="fEmoji">
+          <option value="🐙">🐙 Ammonites</option>
+          <option value="🐚">🐚 Coquillages</option>
+          <option value="🦪">🦪 Pectens/Bivalves</option>
+          <option value="⛏️">⛏️ Mine</option>
+          <option value="💎">💎 Minéraux</option>
+          <option value="🌋">🌋 Volcanique</option>
+          <option value="🦭">🦭 Vertébrés fossiles</option>
+          <option value="🪨">🪨 Géologie</option>
+          <option value="📍">📍 Autre</option>
+        </select>
+        <input type="text" id="fName" placeholder="Nom du site…">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Âge géologique</label>
+      <input type="text" id="fAge" placeholder="ex: Oxfordien moyen (~160 Ma) · ~25 min de Nice">
+    </div>
+    <div class="form-row">
+      <label>Type</label>
+      <select id="fType">
+        <optgroup label="Fossiles">
+          <option value="p">🐚 Pliocène (coquillages)</option>
+          <option value="mi">🦪 Miocène</option>
+          <option value="f30">🐙 Fossiles Méso. ≤30 min</option>
+          <option value="f90">🐙 Fossiles Méso. ≤1h30</option>
+        </optgroup>
+        <optgroup label="Mines & Minéraux">
+          <option value="m30">⛏️ Mine ≤30 min</option>
+          <option value="m90">💎 Mine ≤1h30</option>
+        </optgroup>
+        <optgroup label="Autres">
+          <option value="vol">🌋 Site volcanique</option>
+          <option value="custom" selected>📍 Personnalisé</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Description</label>
+      <textarea id="fDesc" placeholder="Fossiles trouvés, notes terrain, conditions d'accès…"></textarea>
+    </div>
+    <div class="form-row">
+      <label style="display:flex;justify-content:space-between;align-items:center">
+        <span>Minéraux / Espèces clés — par groupe</span>
+        <span onclick="showFullSuggestPanel()" style="cursor:pointer;font-size:.64rem;color:#56ccf2;background:#1e2e3a;border:1px solid #2d4a5a;padding:2px 8px;border-radius:4px;user-select:none">✨ Suggestions</span>
+      </label>
+      <input type="hidden" id="fSuggKey">
+      <div id="speciesSuggestPanel" style="display:none;background:#0c0c1a;border:1px solid #2a2a3e;border-radius:5px;padding:7px;margin-bottom:5px;max-height:200px;overflow-y:auto;font-size:.64rem">
+        <!-- rempli dynamiquement -->
+      </div>
+      <textarea id="fSpecies" placeholder="Format recommandé par groupe :&#10;🐙 Ammonites :&#10;  · Perisphinctes sp.&#10;  · Euaspidoceras perarmatum (Bean, 1839)&#10;🪸 Bélemnites :&#10;  · Hibolithes hastatus (Blainville, 1827)" style="min-height:90px;font-size:.68rem"></textarea>
+      <div style="font-size:.58rem;color:#444;margin-top:2px">Cliquez sur une espèce dans les suggestions pour l'ajouter · Format libre accepté</div>
+    </div>
+    <div class="form-row">
+      <label>Source / Référence + Notice BRGM</label>
+      <input type="text" id="fSource" placeholder="ex: BRGM BD-CHARM-50 unité J5 · O. Bolle (2008) · Mindat loc-1672…">
+      <div id="noticeLinksPanel" style="margin-top:4px;font-size:.63rem;line-height:1.6;background:#08080f;padding:5px 7px;border-radius:4px;border:1px solid #1a1a2e;color:#888">
+        <!-- Liens notice injectés dynamiquement -->
+        Cliquez sur la carte en mode édition pour détecter la feuille BRGM automatiquement.
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Coordonnées GPS</label>
+      <div class="form-coords">
+        <div>
+          <label style="font-size:.6rem;color:#666">Latitude</label>
+          <input type="number" id="fLat" step="0.00001" placeholder="44.03037">
+        </div>
+        <div>
+          <label style="font-size:.6rem;color:#666">Longitude</label>
+          <input type="number" id="fLng" step="0.00001" placeholder="6.86773">
+        </div>
+      </div>
+      <div style="font-size:.6rem;color:#555;margin-top:4px">💡 En mode édition : cliquez sur la carte pour remplir automatiquement les coordonnées</div>
+    </div>
+    <div class="form-row">
+      <label>Notes terrain (privé)</label>
+      <textarea id="fNotes" placeholder="Notes personnelles, accès GPS, conditions, dates de visite…" style="min-height:50px"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="btnDelete" style="display:none" onclick="deleteSite()">🗑️ Supprimer</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveSite()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SITES DE BASE ─────────────────────────────────────────────────────────────
+const BASE_SITES = [
+  // Pliocène
+  {id:'smv',lat:43.876,lng:7.170,t:'p',n:'Argilières Saint-Martin-du-Var',a:'Zancléen basal (~5.3 Ma) · Marnes bleues · ~15 min',d:'Marnes bleues du Zancléen basal. 200–300 coquilles/demi-journée. Argilières désaffectées.',species:'Gemmula rotata · Mitrella thiara · Nassarius bisotensis',src:'Bolle O. (2008) — paleomaniac.over-blog.com',tags:['tf','tf'],tl:['150+ espèces'],min:15},
+  {id:'cagnes',lat:43.663,lng:7.148,t:'p',n:'Argilières Cagnes-sur-Mer',a:'Zancléen sommital (~4.5 Ma) · Marnes bleues · ~15 min',d:'Faunule à caractères thermophiles bien conservée.',species:'Charonia appenninica · Mitrella nassoides · Dentalium sexangulum',src:'Bolle O. (2008) — paleomaniac.over-blog.com',tl:['Gastéropodes thermophiles'],min:15},
+  {id:'nice_c',lat:43.720,lng:7.225,t:'p',n:'Ancienne carrière — faubourgs de Nice',a:'Plaisancien basal (~4.0 Ma) · Poudingues delta du Var · dans Nice',d:'450 coquilles en 2 sorties (O. Bolle 2009). Talus de 10–15 m.',species:'Anadara diluvii · Conus antidiluvianus · Sveltia lyrata · Archimediella spirata',src:'Bolle O. (2009) — paleomaniac.over-blog.com',tl:['450 coquilles/2 sorties','Accès à vérifier'],min:5},
+  // Miocène / Jura
+  {id:'lauves',lat:43.707,lng:7.076,t:'mi',n:'Lauves — Mollasse à Pectens · Tourrettes-sur-Loup',a:'Burdigalien (~23 Ma) · Miocène inf. · ~35 min',d:'Dalles calcaires à Pecten et Clypeaster scillae fossilisés. ENS géré par CEN-PACA depuis 2010. Rester sur sentiers balisés.',src:'CEN-PACA (2023). GéositesAlpesAzur #17.',tl:['Pecten, Clypeaster','ENS CEN-PACA','GéositesAlpesAzur #17'],min:35},
+  {id:'courmettes',lat:43.722,lng:7.064,t:'mi',n:'Gîte fossilifère des Courmettes',a:'Jurassique–Crétacé (~80–220 Ma) · ~35 min',d:'Calcaires Trias/Jura/Crétacé. Séquence jurassique répétée par chevauchement. Fossiles rares mais présents.',src:'courmettes.com. GéositesAlpesAzur #16.',tl:['Fossiles Jura/Crétacé','GéositesAlpesAzur #16','Domaine partiellement privé'],min:35},
+  // Fossiles méso <30
+  {id:'braus',lat:43.872,lng:7.399,t:'f30',n:'Col de Braus — Coupe 1 200 m Jura–Crétacé',a:'Jura–Crétacé inférieur · ~25 min',d:'Section de référence internationale (Buckland, Lyell, XVIIIe s.). 1 200 m de succession continue. Ammonites hétéromorphes dans coupes D2204.',src:'ResearchGate (2010) — Col de Braus Geoheritage. BRGM 0972N.',tl:['Ammonites hétéromorphes','Patrimoine géologique mondial'],min:25},
+  {id:'pontpeille',lat:43.768,lng:7.333,t:'f30',n:'Pont-de-Peille / Fontanil — Albien',a:'Albien terminal (~100 Ma) · ~25 min',d:'Ammonites albiennes à affinités indo-pacifiques dans marnes Cénomanien basal.',species:'Mariella · Stoliczkaia',src:'Delanoy G. & Latil J.-L. (1988) Géobios 21(6).',tl:['Mariella, Stoliczkaia','Accès à vérifier'],min:25},
+  {id:'var_ox',lat:43.820,lng:7.170,t:'f30',n:'D6202 — Marnes oxfordiennes du Var',a:'Oxfordien moyen (~160 Ma) · ~20 min',d:'Marnes noduleuses zones à Plicatilis / Transversarium. Bord de route.',species:'Perisphinctes · Euaspidoceras · Taramelliceras · Gregoryceras · bélemnites',tl:['Perisphinctes','Bélemnites','Bord de route'],min:20},
+  {id:'vesubie',lat:43.870,lng:7.340,t:'f30',n:'Gorges Vésubie — D2565',a:'Callovien–Oxfordien (~160 Ma) · ~25 min',d:'D2565 entre L\'Escarène et Lantosque. Coupes de falaise routière.',species:'Macrocephalites · Choffatia · bélemnites',tl:['Macrocephalites','Bélemnites'],min:25},
+  // Fossiles méso <90
+  {id:'peyroules',lat:43.823,lng:6.583,t:'f90',n:'Peyroules — Marnes à bélemnites',a:'Hauterivien (~130 Ma) · ~1h10',d:'Marnes à bélemnites hauterivicnnes. Fossiles dégagés naturellement par l\'érosion. Visité par Olivier Bolle (14 août 2008).',species:'Duvalia gr. dilatata (Blainville, 1827)',src:'Bolle O. (2009) — paleomaniac.over-blog.com',tl:['Duvalia gr. dilatata','Ramassage de surface'],min:70},
+  {id:'barreme',lat:43.957,lng:6.371,t:'f90',n:'Barrême — Stratotype du Barrémien',a:'Barrémien (~125 Ma) · ~1h15',d:'Ammonites dans les rues et murs. Collection Maurel à la mairie. ⚠️ RNGHP : extraction interdite.',species:'Emericiceras · Crioceratites · Barremites',tl:['Stratotype mondial 1862','RNGHP'],min:75},
+  {id:'senez',lat:43.874,lng:6.367,t:'f90',n:'Arc de Castellane — Senez',a:'Jura–Crétacé · ~1h20',d:'Arc plissé de Castellane. Callovien, Oxfordien, Crétacé inférieur fossilifères. ⚠️ RNGHP.',tl:['Ammonites','Bélemnites','RNGHP'],min:80},
+  {id:'stauban',lat:43.848,lng:6.727,t:'f90',n:'Saint-Auban / Logis du Pin',a:'Jurassique (~130–150 Ma) · ~1h15',d:'Cirques au-dessus du Logis du Pin. Arrière-pays grassois.',species:'Ammonites · bélemnites · oursins · bivalves · pectinidés',src:'draillescantoun.canalblog.com (2010).',tl:['Ammonites','Bélemnites','Oursins','Bivalves'],min:75},
+  {id:'sireniens',lat:43.818,lng:6.510,t:'f90',n:'Site des Siréniens — Col des Lèques',a:'Éocène (~40 Ma) · ~1h25',d:'Ravin de Tabori. 200+ ossements de Halitherium (~40 Ma). Unique mondial. RNGHP. Randonnée ~45 min AR depuis parking col des Lèques.',src:'RNGHP. rando-alpes-haute-provence.fr.',tl:['Halitherium (dugong foss.)','200+ ossements','RNGHP'],min:85},
+  // Mines <30
+  {id:'eguisse',lat:43.894,lng:7.258,t:'m30',n:'Mine de l\'Éguisse — Duranus',a:'As · 1901–1931 · ~50 min + 3h AR à pied',d:'Stockwork calcite-réalgar dans Cénomanien basal. Cheminée carrée intacte (1913). Arrêté municipal 14/09/1992 : galeries interdites.',species:'Réalgar · Duranusite (TL) · Orpiment · Picropharmacolite · Ferrarisite · Calcite scalénoédrique',src:'Perroud P. (1989) Le Cristallier Suisse 8(5). Mindat loc-1672.',tl:['Duranusite TL','Galeries interdites','Haldes libres'],min:50},
+  {id:'luceram',lat:43.883,lng:7.361,t:'m30',n:'Lucéram — Vallon Roccaniéra',a:'As · XIXe · ~25 min',d:'1ère signalisation française de talmessite (Feraud et al., 1976).',species:'Orpiment · Talmessite (1ère France) · Guérinite · Réalgar · Calcite scalénoédrique',src:'Feraud J. et al. (1976) Bull. Soc. fr. Minéral. Cristallogr. 99, 331–333.',tl:['Orpiment','Talmessite (1ère France)'],min:25},
+  {id:'sospel',lat:43.880,lng:7.455,t:'m30',n:'Gypse triasique — Col de Brouis / Sospel',a:'Keuper (Trias sup.) · ~30 min',d:'Cargneules et niveaux gypseux Keuper. Gypse lenticulaire transparent, anhydrite grise, pyrite. Bord D2204.',tl:['Gypse sélénite','Anhydrite','D2204'],min:30},
+  {id:'biot',lat:43.630,lng:7.110,t:'vol',n:'Andésites oligocènes — Biot / VL',a:'Oligocène (~31 Ma) · ~20 min',d:'Brèches andésitiques 5×5 km. Phénocristaux automorphes de labradorite + pyroxènes. Daté 26 Ma. GéositesAlpesAzur #29.',tl:['Volcanique','Labradorite','GéositesAlpesAzur #29'],min:20},
+  {id:'maure',lat:43.552,lng:6.935,t:'vol',n:'Volcan de Maure-Vieil — Mandelieu',a:'Oligocène · caldeira · ~40 min',d:'Méga-caldeira volcanique éteinte dans l\'Esterel–Tanneron. GéositesAlpesAzur #30.',tl:['Méga-caldeira','GéositesAlpesAzur #30'],min:40},
+  // Mines <90
+  {id:'roua',lat:44.03037,lng:6.86773,t:'m90',n:'Mines de Roua — Gorges de Daluis',a:'Cu · Bronze–1884 · Mindat ID 6914 · ~1h',d:'Seule exploitation protohistorique de Cu natif en France (3700–3500 av. J.-C.). 70 espèces, 9 nouvelles. Filonnets dolomite+aragonite. RNR depuis 2012 : observation uniquement. Sentier depuis belvédère du Point Sublime, parking pont de Berthéou D2202, 4 km AR 1h30.',species:'Cuivre natif · Gilmarite TL · Rollandite TL · Rouaite TL · Wallkilldellite-(Fe) TL · Barrotite TL · Algodonite · Adamite',src:'Sarp H., Mari G. (1999) Riviéra Scientifique 12. Mindat ID 6914.',tl:['9 espèces nouvelles','RNR — collecte interdite'],min:60},
+  {id:'leouve',lat:44.010,lng:6.875,t:'m90',n:'Mine de Léouvé (Le Cerisier) — La-Croix-sur-Roudoule',a:'Cu · 1860–1886 · ~1h15 · Musée du Cuivre',d:'Galeries rive droite ravin W de Léouvé. Cu dans conglomérats/grès/pélites Trias inférieur. Musée du Cuivre : 04 93 05 13 25.',species:'Azurite · Malachite · Bornite · Chalcopyrite · Graphite · Quartz',src:'Belot V.R. (1978). Mindat loc-55448.',tl:['Azurite','Malachite','Musée visitable'],min:75},
+  {id:'vallauria',lat:44.103,lng:7.569,t:'m90',n:'Mine de Vallauria — Tende',a:'Pb-Zn-Ag · XIe–1929 · ~1h10 · VISITABLE',d:'20 km galeries Zn-Pb dans cristallin de l\'Argentera. 900 m ouverts. Réservation : mine-vallauria.com. 10°C, vêtements chauds.',species:'Galène · Sphalérite · Chalcopyrite · Malachite · Azurite · Cuivre natif · Molybdénite · Anglésite · Cérussite',src:'Mindat loc-251822.',tl:['Visite guidée','Galène','Sphalérite'],min:70},
+  {id:'merlier',lat:44.200,lng:7.110,t:'m90',n:'Vallon de Merlier — Isola',a:'Pb-Zn · XIXe · ~1h10 + 1h30 à pied · Alt. 2200 m',d:'1ère signalisation française de ménéghinite (1968). Filon N : galène ~80%, blende, bournonite. Accès : Isola → col de la Lombarde → Vacherie de Chastillon (2050 m) → 1h30 à pied.',species:'Galène · Ménéghinite (1ère France) · Sphalérite · Bournonite',src:'Aicard P. et al. (1968) Bull. Soc. fr. Minéral. Cristallogr. 91.',tl:['Ménéghinite (1ère France)','Galène','Alt. 2 200–2 300 m'],min:70},
+  {id:'fontsante',lat:43.574,lng:6.823,t:'m90',n:'Mine de Fontsante — Tanneron',a:'Fluorite · 1919–1987 · ~55 min · Sortie A8 n°37',d:'20 filons dans gneiss du Tanneron. 125 000t (SECME/Péchiney). Haldes librement accessibles. ⚠️ Zone incendie en été.',species:'Fluorite multicolore ≤10 cm (violette, verte, bleue, jaune, rose) · Baryte · Galène · Proustite · Acanthite',src:'Wilson F.A. (1977) Mineralogical Record 8(4). Mindat loc-32050.',tl:['Fluorite ≤10 cm','Proustite rare','Haldes libres'],min:55},
+];
+
+// ─── CONFIG ────────────────────────────────────────────────────────────────────
+const C={p:'#22c55e',mi:'#a3e635',f30:'#84cc16',f90:'#3b82f6',m30:'#f59e0b',m90:'#a855f7',vol:'#ec4899',custom:'#56ccf2'};
+const TABS_FOR_TYPE={p:'plio',mi:'plio',f30:'meso',f90:'meso',m30:'mines',m90:'mines',vol:'mines',custom:'custom'};
+
+let editMode=false;
+let currentEditId=null;
+let tempMarker=null;
+
+// ─── MAP INIT ──────────────────────────────────────────────────────────────────
+const map=L.map('map').setView([43.88,7.1],10);
+const layers={
+  ign:L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png&STYLE=normal',{attribution:'© IGN',maxZoom:18}),
+  osm:L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19,opacity:.5}),
+  sat:L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/jpeg&STYLE=normal',{attribution:'© IGN',maxZoom:20}),
+  brgm:   L.tileLayer.wms('https://geoservices.brgm.fr/geologie',{layers:'GEOLOGIE',           format:'image/png',transparent:true,opacity:.55,attribution:'© BRGM BD-CHARM-50',version:'1.3.0',uppercase:true}),
+  // LITHO_1M_SIMPLIFIEE : seul vrai nom de couche lithologique dans ce service (GetCapabilities)
+  litho:  L.tileLayer.wms('https://geoservices.brgm.fr/geologie',{layers:'LITHO_1M_SIMPLIFIEE',format:'image/png',transparent:true,opacity:.60,attribution:'© BRGM Lithologie 1/1M',version:'1.3.0',uppercase:true}),
+  // Les failles ne sont PAS une couche WMS séparée dans ce service.
+  // SCAN_D_GEOL50 = scan numérique des cartes 1/50 000 qui inclut les figurés de failles (visible zoom ≥11)
+  fault:  L.tileLayer.wms('https://geoservices.brgm.fr/geologie',{layers:'SCAN_D_GEOL50',      format:'image/png',transparent:true,opacity:.80,attribution:'© BRGM Scan 1/50 000',version:'1.3.0',uppercase:true}),
+  // Carte harmonisée 1/50 000 avec éléments structuraux intégrés (zoom ≥10 requis)
+  struct: L.tileLayer.wms('https://geoservices.brgm.fr/geologie',{layers:'SCAN_H_GEOL50_SCAN', format:'image/png',transparent:true,opacity:.65,attribution:'© BRGM Harm-50',version:'1.3.0',uppercase:true}),
+};
+const lSt={ign:true,osm:true,sat:false,brgm:true,litho:false,fault:false,struct:false};
+layers.ign.addTo(map);layers.osm.addTo(map);layers.brgm.addTo(map);
+
+const grps={p:L.layerGroup(),mi:L.layerGroup(),f30:L.layerGroup(),f90:L.layerGroup(),m30:L.layerGroup(),m90:L.layerGroup(),vol:L.layerGroup(),z:L.layerGroup(),custom:L.layerGroup()};
+Object.values(grps).forEach(g=>g.addTo(map));
+
+// ZONES GÉOLOGIQUES
+[
+  {c:[[43.62,7.04],[43.76,7.26],[43.73,7.30],[43.60,7.06]],col:'#22c55e',n:'Bassin pliocène du Var',d:'SMV (Zancléen basal) — Cagnes (Zancléen sommital) — Nice (Plaisancien). 150+ espèces. O. Bolle.'},
+  {c:[[43.69,6.97],[43.74,7.12],[43.71,7.15],[43.67,7.00]],col:'#a3e635',n:'Tourrettes-sur-Loup — Miocène + Jura',d:'Mollasse à Pectens Burdigalien (Lauves ENS). Courmettes (Jura–Crétacé). GéositesAlpesAzur.'},
+  {c:[[43.83,7.05],[43.93,7.28],[43.82,7.30],[43.77,7.10]],col:'#3b82f6',n:'Zone oxfordienne transitionnelle',d:'Oxfordien moyen — Perisphinctes, Euaspidoceras, bélemnites. D6202.'},
+  {c:[[43.75,7.28],[43.87,7.42],[43.87,7.38],[43.77,7.28]],col:'#ef4444',n:'Crétacé inférieur (Col de Braus)',d:'1200 m coupe Jura–Crétacé. Patrimoine géologique mondial.'},
+  {c:[[43.86,7.30],[43.93,7.38],[43.88,7.30]],col:'#f59e0b',n:'Filons arsenicaux Duranus–Lucéram',d:'Duranusite (loc-1672). Talmessite (Lucéram). Cénomanien basal.'},
+  {c:[[44.00,6.80],[44.08,6.93],[44.06,6.88],[43.99,6.82]],col:'#f59e0b',n:'Mines de Roua (ID 6914) + Léouvé',d:'44.03037°N 6.86773°E. Cuivre natif protohistorique. 9 espèces. Lambert X=961.22, Y=203.76.'},
+  {c:[[43.90,6.20],[43.99,6.42],[44.02,6.50],[43.94,6.25]],col:'#22c55e',n:'Arc Castellane / RNGHP',d:'Stratotype Barrémien 1862. Peyroules Hauterivien (O. Bolle 2009). Site Siréniens Éocène.'},
+  {c:[[43.53,6.75],[43.62,6.88],[43.64,6.79],[43.55,6.68]],col:'#a855f7',n:'Fontsante (Tanneron) — Fluorite',d:'20 filons CaF₂. Proustite. Référence mondiale. Mindat loc-32050.'},
+].forEach(z=>{
+  const p=L.polygon(z.c,{color:z.col,weight:1.2,dashArray:'6 4',fillColor:z.col,fillOpacity:.07});
+  p.bindPopup(`<div class="pt">${z.n}</div><div class="pb">${z.d}</div>`);
+  grps.z.addLayer(p);
+});
+
+// Cercles de rayon
+L.circle([43.710,7.262],{radius:28000,color:'#22c55e',weight:1.2,dashArray:'8 5',fillOpacity:.025,fillColor:'#22c55e'}).addTo(map);
+L.circle([43.710,7.262],{radius:85000,color:'#f2994a',weight:1,dashArray:'8 5',fillOpacity:.012,fillColor:'#f2994a'}).addTo(map);
+
+// ─── MARKER FACTORY ────────────────────────────────────────────────────────────
+function mkIcon(t, emoji, isCustom=false){
+  const c=C[t]||'#56ccf2';
+  const e=emoji||'📍';
+  const border=isCustom?'3px dashed rgba(86,204,242,.7)':'2px solid rgba(255,255,255,.25)';
+  return L.divIcon({className:'',html:`<div style="width:30px;height:30px;background:${c};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.88rem;box-shadow:0 2px 8px rgba(0,0,0,.6);border:${border};">${e}</div>`,iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-17]});
+}
+
+// ─── MARKERS ──────────────────────────────────────────────────────────────────
+const MKS={};
+
+function emojiForType(t){
+  return {p:'🐚',mi:'🦪',f30:'🐙',f90:'🐙',m30:'⛏️',m90:'💎',vol:'🌋',custom:'📍'}[t]||'📍';
+}
+
+function addMarker(s, isCustom=false){
+  const emoji = s.emoji || emojiForType(s.t);
+  const m = L.marker([s.lat, s.lng], {icon:mkIcon(s.t, emoji, isCustom), draggable:false});
+  const grp = grps[s.t]||grps.custom;
+  grp.addLayer(m);
+
+  // Drag : déplacement en mode édition
+  m.on('dragend', function(ev){
+    const pos = ev.target.getLatLng();
+    const lat = parseFloat(pos.lat.toFixed(6));
+    const lng = parseFloat(pos.lng.toFixed(6));
+    const cs = customSites.find(x=>x.id===s.id);
+    if(cs){
+      cs.lat=lat; cs.lng=lng;
+      saveCustomSites(customSites);
+      renderCustomList();
+      showToast(`📍 ${cs.n} déplacé → ${lat.toFixed(4)}°N ${lng.toFixed(4)}°E`);
+    } else {
+      // site de base : juste un retour visuel, pas de sauvegarde permanente
+      showToast(`ℹ️ Site de base — position temporairement modifiée (non sauvegardée)`,'#f59e0b');
+    }
+  });
+
+  m.on('click', (e)=>{
+    if(editMode && !m._justDragged){
+      openEditModal(s.id, e.latlng);
+    } else if(!editMode) {
+      const tags=(s.tl||[]).map(t=>`<span class="tag tf">${t}</span>`).join('');
+      const sp=s.species?`<div style="font-size:.63rem;color:#f0a828;margin-top:4px">${formatSpeciesPopup(s.species)}</div>`:'';
+      const src=s.src?`<div class="src">${s.src}</div>`:'';
+      const notes=s.notes?`<div style="font-size:.62rem;color:#76b;margin-top:4px;border-top:1px dashed #2a2a3e;padding-top:4px">🔒 ${s.notes}</div>`:'';
+      const editBtnHtml = isCustom?`<button class="ppop-btn ppop-edit" onclick="openEditModal('${s.id}')">✏️ Modifier</button><button class="ppop-btn ppop-del" onclick="deleteSiteFromMap('${s.id}')">🗑️</button>`:'';
+      m.bindPopup(`
+        <div class="pt">${emoji} ${s.n}</div>
+        <div class="pb"><b style="color:#b8903e">${s.a}</b><br>${s.d}</div>
+        ${tags}<br>${sp}
+        ${src}${notes}
+        <div class="pc">${s.lat.toFixed(5)}°N ${s.lng.toFixed(5)}°E</div>
+        <div class="ppop-btns">
+          <button class="ppop-btn ppop-tab" onclick="focusTab('${s.id}')">Détail →</button>
+          ${editBtnHtml}
+        </div>
+      `,{maxWidth:270}).openPopup();
+    }
+    m._justDragged=false;
+  });
+
+  m.on('dragstart', ()=>{ m._justDragged=true; });
+
+  MKS[s.id]=m;
+  return m;
+}
+
+function formatSpeciesPopup(str){
+  return str.split('·').map(x=>`<span style="display:inline-block;margin:1px 3px 1px 0;font-style:italic">${x.trim()}</span>`).join(' · ');
+}
+
+BASE_SITES.forEach(s=>addMarker(s,false));
+
+// ─── CUSTOM SITES (localStorage) ──────────────────────────────────────────────
+function loadCustomSites(){
+  try{ return JSON.parse(localStorage.getItem('geo_nice_custom')||'[]'); }
+  catch(e){ return []; }
+}
+function saveCustomSites(arr){
+  localStorage.setItem('geo_nice_custom', JSON.stringify(arr));
+}
+
+let customSites = loadCustomSites();
+customSites.forEach(s=>addMarker(s,true));
+
+function renderAllLists(){
+  renderList('plio', ['p','mi']);
+  renderList('meso', ['f30','f90']);
+  renderList('mines', ['m30','m90','vol']);
+  renderCustomList();
+  updateCounter();
+}
+
+function updateCounter(){
+  const n=BASE_SITES.length+customSites.length;
+  document.getElementById('site-count').textContent=n+' sites';
+}
+
+function renderList(tab, types){
+  const el=document.getElementById('list-'+tab);
+  if(!el)return;
+  const sites=BASE_SITES.filter(s=>types.includes(s.t));
+  el.innerHTML=sites.map(s=>cardHTML(s,false)).join('');
+}
+
+function renderCustomList(){
+  const el=document.getElementById('list-custom');
+  if(!el)return;
+  if(customSites.length===0){
+    el.innerHTML='<div class="ibox" style="color:#555;text-align:center">Aucun site personnalisé.<br>Activez le mode édition ✏️ puis cliquez sur la carte.</div>';
+    return;
+  }
+  el.innerHTML=customSites.map(s=>cardHTML(s,true)).join('');
+}
+
+function cardHTML(s, isCustom){
+  const emoji=s.emoji||emojiForType(s.t);
+  const tags=(s.tl||[]).map(tl=>`<span class="tag tf">${tl}</span>`).join('');
+  const species=s.species?`<ul class="sl">${s.species.split('·').map(x=>`<li><i>${x.trim()}</i></li>`).join('')}</ul>`:'';
+  const src=s.src?`<div class="src">${s.src}</div>`:'';
+  const notes=s.notes?`<div style="font-size:.62rem;color:#76b;margin-top:4px">🔒 ${s.notes}</div>`:'';
+  const customBadge=isCustom?`<span class="custom-badge">personnel</span>`:'';
+  const editBtn=isCustom?`<button class="card-edit-btn" onclick="event.stopPropagation();openEditModal('${s.id}')">✏️ Modifier</button>`:'';
+  return `<div class="card${isCustom?' custom':''}" data-min="${s.min||0}" data-id="${s.id}" onclick="focusSite('${s.id}')">
+    ${editBtn}
+    <div class="ch"><div class="ci">${emoji}</div><div>
+      <div class="ct">${s.n}${customBadge}</div>
+      <div class="cs">${s.a}</div>
+    </div></div>
+    <div>${tags}</div>
+    <div class="coo">${s.lat.toFixed(5)}°N ${s.lng.toFixed(5)}°E</div>
+    <div class="cb">${s.d}</div>
+    ${species}${src}${notes}
+  </div>`;
+}
+
+renderAllLists();
+
+// ─── EDIT MODE ─────────────────────────────────────────────────────────────────
+function toggleEdit(){
+  editMode=!editMode;
+  const btn=document.getElementById('editBtn');
+  const hint=document.getElementById('editHint');
+  btn.textContent=editMode?'✅ Mode édition ON':'✏️ Mode édition';
+  btn.classList.toggle('on',editMode);
+  hint.classList.toggle('on',editMode);
+  map.getContainer().style.cursor=editMode?'crosshair':'';
+  // Active / désactive le drag sur tous les marqueurs
+  Object.values(MKS).forEach(m=>{
+    try{ editMode ? m.dragging.enable() : m.dragging.disable(); }catch(e){}
+  });
+  if(!editMode) showToast('Mode édition désactivé · Toutes les positions sont sauvegardées','#22c55e');
+}
+
+// Clic sur la carte en mode édition → requête BRGM puis ouverture formulaire
+map.on('click', async function(e){
+  if(!editMode) return;
+  // Si un marqueur est en cours de drag, ignorer
+  const spinEl = document.getElementById('editSpinner');
+  if(spinEl) spinEl.style.display='flex';
+  try {
+    const info = await queryBRGM(e.latlng);
+    openNewModal(e.latlng, info);
+  } catch(err){
+    openNewModal(e.latlng, null);
+  } finally {
+    if(spinEl) spinEl.style.display='none';
+  }
+});
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function openNewModal(latlng, brgmInfo=null){
+  currentEditId=null;
+  const lat=latlng.lat.toFixed(5), lng=latlng.lng.toFixed(5);
+  document.getElementById('modalTitle').innerHTML=
+    `✏️ Ajouter un site <span style="font-size:.62rem;color:#56ccf2">${lat}°N ${lng}°E</span>`;
+  document.getElementById('fEmoji').value='📍';
+  document.getElementById('fName').value='';
+  document.getElementById('fType').value='custom';
+  document.getElementById('fDesc').value='';
+  document.getElementById('fSpecies').value='';
+  document.getElementById('fNotes').value='';
+  document.getElementById('fLat').value=latlng.lat.toFixed(6);
+  document.getElementById('fLng').value=latlng.lng.toFixed(6);
+  document.getElementById('btnDelete').style.display='none';
+
+  // Préremplir avec infos BRGM si disponibles
+  if(brgmInfo){
+    document.getElementById('fAge').value=brgmInfo.age||'';
+    if(brgmInfo.type) document.getElementById('fType').value=brgmInfo.type;
+    if(brgmInfo.emoji) document.getElementById('fEmoji').value=brgmInfo.emoji;
+    // Source et lien notice
+    const srcVal = brgmInfo.unitCode?
+      `BRGM BD-CHARM-50 — unité ${brgmInfo.unitCode} (${brgmInfo.unitName||''})`:
+      '';
+    document.getElementById('fSource').value=srcVal;
+    updateNoticeLinks(brgmInfo.sheet, brgmInfo.unitCode);
+    // Suggestions d'espèces selon période
+    if(brgmInfo.suggestionKey){
+      applySpeciesSuggestion(brgmInfo.suggestionKey);
+    }
+  } else {
+    document.getElementById('fAge').value='';
+    document.getElementById('fSource').value='';
+    updateNoticeLinks(findSheetForCoords(latlng.lat, latlng.lng), null);
+  }
+  ['fEmoji','fName','fAge','fType','fDesc','fSpecies','fSource','fLat','fLng','fNotes'].forEach(id=>{
+    document.getElementById(id).removeAttribute('disabled');
+  });
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('fName').focus();
+}
+
+function openEditModal(id, latlng){
+  currentEditId=id;
+  const s=BASE_SITES.find(x=>x.id===id)||customSites.find(x=>x.id===id);
+  if(!s) return;
+  const isCustom=!!customSites.find(x=>x.id===id);
+  document.getElementById('modalTitle').innerHTML=(isCustom?'✏️ Modifier':'👁️ Voir ')+'<span style="font-size:.62rem;color:#b8903e">'+s.n+'</span>';
+  document.getElementById('fEmoji').value=s.emoji||emojiForType(s.t);
+  document.getElementById('fName').value=s.n;
+  document.getElementById('fAge').value=s.a;
+  document.getElementById('fType').value=s.t;
+  document.getElementById('fDesc').value=s.d;
+  document.getElementById('fSpecies').value=s.species||'';
+  document.getElementById('fSource').value=s.src||'';
+  document.getElementById('fLat').value=s.lat.toFixed(6);
+  document.getElementById('fLng').value=s.lng.toFixed(6);
+  document.getElementById('fNotes').value=s.notes||'';
+  document.getElementById('fSuggKey').value=s.suggestionKey||'';
+  document.getElementById('btnDelete').style.display=isCustom?'':'none';
+  document.getElementById('speciesSuggestPanel').style.display='none';
+  // Charger les liens notice
+  const sheet=findSheetForCoords(s.lat, s.lng);
+  updateNoticeLinks(sheet, null);
+  document.getElementById('modalOverlay').classList.add('open');
+  if(!isCustom){
+    ['fEmoji','fName','fAge','fType','fDesc','fSpecies','fSource','fLat','fLng'].forEach(id=>{
+      document.getElementById(id).setAttribute('disabled','disabled');
+    });
+    document.getElementById('fNotes').removeAttribute('disabled');
+  } else {
+    ['fEmoji','fName','fAge','fType','fDesc','fSpecies','fSource','fLat','fLng','fNotes'].forEach(id=>{
+      document.getElementById(id).removeAttribute('disabled');
+    });
+  }
+}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('open');
+  ['fEmoji','fName','fAge','fType','fDesc','fSpecies','fSource','fLat','fLng','fNotes'].forEach(id=>{
+    document.getElementById(id).removeAttribute('disabled');
+  });
+  currentEditId=null;
+}
+
+function modalClickOutside(e){
+  if(e.target===document.getElementById('modalOverlay')) closeModal();
+}
+
+function saveSite(){
+  const lat=parseFloat(document.getElementById('fLat').value);
+  const lng=parseFloat(document.getElementById('fLng').value);
+  if(isNaN(lat)||isNaN(lng)){alert('Coordonnées invalides');return;}
+  const name=document.getElementById('fName').value.trim();
+  if(!name){alert('Nom du site obligatoire');return;}
+
+  // Si c'est un site de base, on sauvegarde juste les notes
+  if(currentEditId && BASE_SITES.find(x=>x.id===currentEditId)){
+    // Save notes only
+    const notes=document.getElementById('fNotes').value;
+    const existing=customSites.find(x=>x.id==='note_'+currentEditId);
+    if(existing){existing.notes=notes;}
+    else{customSites.push({id:'note_'+currentEditId,notes,_noteFor:currentEditId});}
+    saveCustomSites(customSites);
+    closeModal();
+    return;
+  }
+
+  const t=document.getElementById('fType').value;
+  const site={
+    id: currentEditId || 'custom_'+Date.now(),
+    lat,lng,t,
+    n: name,
+    a: document.getElementById('fAge').value,
+    d: document.getElementById('fDesc').value,
+    species: document.getElementById('fSpecies').value,
+    src: document.getElementById('fSource').value,
+    notes: document.getElementById('fNotes').value,
+    emoji: document.getElementById('fEmoji').value,
+    suggestionKey: document.getElementById('fSuggKey').value||null,
+    tl: [],
+    min: 0,
+  };
+
+  if(currentEditId){
+    const idx=customSites.findIndex(x=>x.id===currentEditId);
+    if(idx>=0){
+      // remove old marker
+      const oldG=grps[customSites[idx].t]||grps.custom;
+      if(MKS[currentEditId]) oldG.removeLayer(MKS[currentEditId]);
+      customSites[idx]=site;
+    }
+  } else {
+    customSites.push(site);
+  }
+  saveCustomSites(customSites);
+  addMarker(site,true);
+  renderCustomList();
+  updateCounter();
+  closeModal();
+  // Fly to
+  map.flyTo([lat,lng],14,{duration:1});
+  setTimeout(()=>MKS[site.id]?.openPopup(),1200);
+}
+
+function deleteSite(){
+  if(!currentEditId) return;
+  if(!confirm('Supprimer ce site ?')) return;
+  const idx=customSites.findIndex(x=>x.id===currentEditId);
+  if(idx>=0){
+    const s=customSites[idx];
+    const g=grps[s.t]||grps.custom;
+    if(MKS[s.id]) g.removeLayer(MKS[s.id]);
+    delete MKS[s.id];
+    customSites.splice(idx,1);
+    saveCustomSites(customSites);
+    renderCustomList();
+    updateCounter();
+  }
+  closeModal();
+}
+
+function deleteSiteFromMap(id){
+  if(!confirm('Supprimer ce site ?')) return;
+  const idx=customSites.findIndex(x=>x.id===id);
+  if(idx>=0){
+    const s=customSites[idx];
+    const g=grps[s.t]||grps.custom;
+    if(MKS[s.id]) g.removeLayer(MKS[s.id]);
+    delete MKS[s.id];
+    customSites.splice(idx,1);
+    saveCustomSites(customSites);
+    renderCustomList();
+    updateCounter();
+  }
+  map.closePopup();
+}
+
+// ─── EXPORT / IMPORT ──────────────────────────────────────────────────────────
+function exportJSON(){
+  const data={version:1,sites:customSites,exported:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='geo_nice_mes_sites_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+}
+
+function importJSON(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      const imported=(data.sites||data);
+      if(!Array.isArray(imported)) throw new Error('Format invalide');
+      let added=0;
+      imported.forEach(s=>{
+        if(!customSites.find(x=>x.id===s.id)){
+          customSites.push(s);
+          addMarker(s,true);
+          added++;
+        }
+      });
+      saveCustomSites(customSites);
+      renderCustomList();
+      updateCounter();
+      alert(added+' site(s) importé(s).');
+    } catch(err){
+      alert('Erreur import: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+
+function confirmClearCustom(){
+  if(!confirm('Supprimer TOUS les sites personnalisés ?')) return;
+  customSites.forEach(s=>{
+    const g=grps[s.t]||grps.custom;
+    if(MKS[s.id]) g.removeLayer(MKS[s.id]);
+    delete MKS[s.id];
+  });
+  customSites=[];
+  saveCustomSites([]);
+  renderCustomList();
+  updateCounter();
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────────────────────
+function focusSite(id){
+  const s=BASE_SITES.find(x=>x.id===id)||customSites.find(x=>x.id===id);
+  if(!s) return;
+  map.flyTo([s.lat,s.lng],14,{duration:1.2});
+  setTimeout(()=>MKS[id]?.openPopup(),1300);
+}
+
+function focusTab(id){
+  const s=BASE_SITES.find(x=>x.id===id)||customSites.find(x=>x.id===id);
+  if(!s) return;
+  const tab=TABS_FOR_TYPE[s.t]||'custom';
+  sT(tab);
+  setTimeout(()=>{
+    const el=document.querySelector(`[data-id="${id}"]`);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
+  },150);
+}
+
+function fF(tab, r){
+  document.querySelectorAll(`#list-${tab} .card`).forEach(c=>{
+    if(r===0){c.style.display='';return;}
+    const m=parseInt(c.dataset.min||999);
+    c.style.display=(m<=r)?'':'none';
+  });
+}
+
+// ─── LAYER CONTROLS ───────────────────────────────────────────────────────────
+function tl(id){
+  lSt[id]=!lSt[id];
+  document.getElementById('btn-'+id).classList.toggle('on',lSt[id]);
+  lSt[id]?(!map.hasLayer(layers[id])&&map.addLayer(layers[id])):(map.hasLayer(layers[id])&&map.removeLayer(layers[id]));
+}
+function sO(id,v){layers[id].setOpacity(v/100);document.getElementById('sp-'+id).textContent=v+'%';}
+const mSt={p:true,mi:true,f30:true,f90:true,m30:true,m90:true,vol:true,z:true,custom:true};
+function tM(t){
+  mSt[t]=!mSt[t];
+  document.getElementById('btn-m'+t).classList.toggle('on',mSt[t]);
+  mSt[t]?(!map.hasLayer(grps[t])&&map.addLayer(grps[t])):(map.hasLayer(grps[t])&&map.removeLayer(grps[t]));
+}
+function sT(n){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const ns=['layers','plio','meso','mines','custom','legend'];
+    t.classList.toggle('active',ns[i]===n);
+  });
+  document.querySelectorAll('.tc').forEach(c=>c.classList.toggle('active',c.id==='tc-'+n));
+}
+
+L.control.scale({imperial:false}).addTo(map);
+
+// Keyboard shortcut: Escape ferme modal
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+// ─── BRGM GetFeatureInfo ───────────────────────────────────────────────────────
+async function queryBRGM(latlng){
+  const {lat,lng}=latlng;
+  // Bbox de 500m autour du point
+  const d=0.005;
+  const bbox=`${lat-d},${lng-d},${lat+d},${lng+d}`;
+  const url=`https://geoservices.brgm.fr/geologie?`+
+    `SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo`+
+    `&LAYERS=GEOLOGIE&QUERY_LAYERS=GEOLOGIE`+
+    `&CRS=EPSG%3A4326&BBOX=${bbox}`+
+    `&WIDTH=101&HEIGHT=101&I=50&J=50`+
+    `&INFO_FORMAT=text%2Fhtml`;
+  let raw='';
+  try{
+    const r=await fetch(url,{mode:'cors',signal:AbortSignal.timeout(5000)});
+    raw=await r.text();
+  }catch(err){
+    console.warn('[BRGM] GetFeatureInfo failed:',err.message);
+    // Fallback : utilise la feuille locale
+    const sheet=findSheetForCoords(lat,lng);
+    return sheet?{sheet,age:'',suggestionKey:null,unitCode:null}:null;
+  }
+  return parseBRGMResponse(raw,latlng);
+}
+
+function parseBRGMResponse(html,latlng){
+  if(!html||html.length<30) return null;
+  // Extrait les paires clé=valeur du tableau HTML renvoyé par BRGM
+  const cells={};
+  const rows=html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)||[];
+  rows.forEach(row=>{
+    const tds=row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)||[];
+    if(tds.length>=2){
+      const k=tds[0].replace(/<[^>]+>/g,'').trim().toUpperCase();
+      const v=tds[1].replace(/<[^>]+>/g,'').trim();
+      if(k) cells[k]=v;
+    }
+  });
+  // Cherche les champs BRGM communs (notation, description, code_legende, etc.)
+  const notation = cells['NOTATION']||cells['CODE']||cells['CODE_LEGENDE']||cells['SYMBOL']||'';
+  const desc     = cells['DESCRIPTION']||cells['NOM_LEGENDE']||cells['LEGENDE']||cells['LIBELLE']||'';
+  const nomCarte = cells['NOM_CARTE']||cells['FEUILLE']||cells['NUMERO']||'';
+
+  // Feuille de référence
+  const sheet = nomCarte ? guessBRGMSheet(nomCarte) : findSheetForCoords(latlng.lat, latlng.lng);
+
+  // Déduction de l'âge et des suggestions depuis la notation
+  const mapped = mapNotationToAge(notation, desc);
+
+  return {
+    sheet,
+    unitCode: notation||null,
+    unitName: desc||null,
+    age: mapped.age,
+    type: mapped.type,
+    emoji: mapped.emoji,
+    suggestionKey: mapped.key,
+  };
+}
+
+// ─── Correspondance notation BRGM → âge ────────────────────────────────────────
+function mapNotationToAge(notation, desc){
+  const n=(notation||'').toUpperCase();
+  const d=(desc||'').toLowerCase();
+  // Priorité : notation BRGM officielle
+  // Pliocène
+  if(/^(E5|E6|PL|G5|G6|M5|M6)/.test(n)||d.includes('pliocène')||d.includes('plaisancien')||d.includes('zanclé'))
+    return{age:'Pliocène (~3,5–5,3 Ma)',type:'p',emoji:'🐚',key:'plio'};
+  // Miocène
+  if(/^(M|G4|G3|E4|BURG|LANG|SERR|TORT|MESS)/.test(n)||d.includes('miocène')||d.includes('burdigalien')||d.includes('mollasse'))
+    return{age:'Miocène (~5–23 Ma)',type:'mi',emoji:'🦪',key:'mio'};
+  // Eocène
+  if(/^(E[1-3]|LUT|BAR|YPR|EO)/.test(n)||d.includes('éocène')||d.includes('lutétien'))
+    return{age:'Éocène (~33–56 Ma)',type:'f90',emoji:'🦭',key:'eocene'};
+  // Crétacé supérieur
+  if(/^(C[6-9]|K[3-5]|MAAS|CAMP|SANT|CONI|TUR|CEN)/.test(n)||d.includes('cénomanien')||d.includes('turonien')||d.includes('campanien'))
+    return{age:'Crétacé supérieur (~66–100 Ma)',type:'f90',emoji:'🐙',key:'cretsup'};
+  // Albien
+  if(/^(C5|K3[A-Z]?|ALB)/.test(n)||d.includes('albien'))
+    return{age:'Albien (~100–113 Ma)',type:'f90',emoji:'🐙',key:'alb'};
+  // Aptien
+  if(/^(C4|K2[B-Z]?|APT)/.test(n)||d.includes('aptien'))
+    return{age:'Aptien (~113–121 Ma)',type:'f90',emoji:'🐙',key:'apt'};
+  // Barrémien
+  if(/^(C3|K2A|BAR)/.test(n)||d.includes('barrémien'))
+    return{age:'Barrémien (~121–126 Ma) — Stratotype Barrême',type:'f90',emoji:'🐙',key:'bar'};
+  // Hauterivien
+  if(/^(C2|K2|HAU)/.test(n)||d.includes('hauterivien'))
+    return{age:'Hauterivien (~126–132 Ma)',type:'f90',emoji:'🐙',key:'haut'};
+  // Valanginien/Berriasien
+  if(/^(C1|K1|VAL|BER)/.test(n)||d.includes('valanginien')||d.includes('berriasien'))
+    return{age:'Valanginien–Berriasien (~132–145 Ma)',type:'f90',emoji:'🐙',key:'berval'};
+  // Tithonien
+  if(/^(J8|J9|J10|TIT)/.test(n)||d.includes('tithonien'))
+    return{age:'Tithonien–Kimméridgien (~145–157 Ma)',type:'f90',emoji:'🐙',key:'titho'};
+  // Oxfordien
+  if(/^(J[567]|OXFORD|OXF)/.test(n)||d.includes('oxfordien')||d.includes('argovien'))
+    return{age:'Oxfordien moyen (~155–165 Ma)',type:'f30',emoji:'🐙',key:'oxford'};
+  // Callovien / Bathonien / Bajocien
+  if(/^(J[234]|CAL|BATH|BAJ)/.test(n)||d.includes('callovien')||d.includes('bathonien')||d.includes('bajocien'))
+    return{age:'Callovien–Bajocien (~165–175 Ma)',type:'f30',emoji:'🐙',key:'callovo'};
+  // Jurassique inférieur / Lias
+  if(/^(J[01]|LIA|LIAS|SIN|PLI|TOA|AAL|HETT)/.test(n)||d.includes('jurassique')&&d.includes('inférieur')||d.includes('lias')||d.includes('sinémurien'))
+    return{age:'Jurassique inférieur — Lias (~175–200 Ma)',type:'f90',emoji:'🐙',key:'lias'};
+  // Trias
+  if(/^(T[1-5]|TR|KEUPER|MUSCH|BUNT)/.test(n)||d.includes('trias')||d.includes('keuper')||d.includes('muschelkalk'))
+    return{age:'Trias (~200–252 Ma)',type:'m30',emoji:'🪨',key:'trias'};
+  // Permien
+  if(/^(P[1-3]|PERM|AUTUN|SAXO|THUR)/.test(n)||d.includes('permien'))
+    return{age:'Permien (~252–298 Ma)',type:'m90',emoji:'⛏️',key:'perm'};
+  // Socle cristallin / métamorphique
+  if(/^(γ|δ|µ|η|ξ|[A-Z]{1,2}[0-9]?[a-z]?)/.test(notation)||d.includes('gneiss')||d.includes('granite')||d.includes('micaschiste')||d.includes('amphibolite'))
+    return{age:'Socle cristallin varisque (~300–400 Ma)',type:'m90',emoji:'⛏️',key:'socle'};
+  // Quaternaire
+  if(/^(Q|Fy|Fx|Fz|Gy|Gz|LP|LP|RS|RS|CF)/.test(n)||d.includes('quaternaire')||d.includes('alluvion')||d.includes('holocène'))
+    return{age:'Quaternaire (< 2,6 Ma)',type:'p',emoji:'🪨',key:'quat'};
+  return {age:desc?desc.slice(0,80):'', type:'custom', emoji:'📍', key:null};
+}
+
+// ─── Feuilles BRGM 1:50 000 (région Nice + ~1h30) ─────────────────────────────
+const BRGM_SHEETS=[
+  {code:'0997N',name:'Cagnes-sur-Mer',    latMin:43.58,lngMin:6.87,latMax:43.87,lngMax:7.20},
+  {code:'0998N',name:'Nice',              latMin:43.58,lngMin:7.17,latMax:43.87,lngMax:7.52},
+  {code:'0972N',name:'Roquesteron',       latMin:43.83,lngMin:6.83,latMax:44.17,lngMax:7.17},
+  {code:'0973N',name:'Levens',            latMin:43.83,lngMin:7.17,latMax:44.17,lngMax:7.52},
+  {code:'0999N',name:'Grasse-Cannes',     latMin:43.58,lngMin:6.53,latMax:43.87,lngMax:6.88},
+  {code:'0971N',name:'Puget-Théniers',    latMin:43.83,lngMin:6.48,latMax:44.17,lngMax:6.83},
+  {code:'0970N',name:'Entrevaux',         latMin:43.83,lngMin:6.13,latMax:44.17,lngMax:6.48},
+  {code:'1025N',name:'Castellane',        latMin:43.58,lngMin:6.13,latMax:43.87,lngMax:6.53},
+  {code:'1026N',name:'Annot',             latMin:43.83,lngMin:6.48,latMax:44.17,lngMax:6.83},
+  {code:'1051N',name:'Saorge',            latMin:43.83,lngMin:7.48,latMax:44.17,lngMax:7.83},
+  {code:'1052N',name:'Tende',             latMin:44.00,lngMin:7.40,latMax:44.25,lngMax:7.68},
+  {code:'1024N',name:'St-André-les-Alpes',latMin:43.83,lngMin:6.13,latMax:44.17,lngMax:6.48},
+  {code:'1000N',name:'Cannes-Antibes',    latMin:43.45,lngMin:6.87,latMax:43.62,lngMax:7.22},
+  {code:'0996N',name:'Fréjus-St-Raphaël', latMin:43.37,lngMin:6.53,latMax:43.62,lngMax:6.88},
+];
+function findSheetForCoords(lat,lng){
+  return BRGM_SHEETS.find(s=>lat>=s.latMin&&lat<=s.latMax&&lng>=s.lngMin&&lng<=s.lngMax)||null;
+}
+function guessBRGMSheet(nomCarte){
+  const n=nomCarte.toUpperCase();
+  return BRGM_SHEETS.find(s=>n.includes(s.code)||n.includes(s.name.toUpperCase()))||null;
+}
+
+// ─── Liens notice BRGM ─────────────────────────────────────────────────────────
+function updateNoticeLinks(sheet, unitCode){
+  const el=document.getElementById('noticeLinksPanel');
+  if(!el)return;
+  if(!sheet){el.innerHTML='<span style="color:#555">Feuille non détectée — vérifier les coordonnées</span>';return;}
+  const pdfUrl=`http://ficheinfoterre.brgm.fr/Notices/${sheet.code}N.pdf`;
+  const ficheUrl=`https://infoterre.brgm.fr/viewer/MainTileForward.do?rub=30`;
+  const unitTxt=unitCode?` | Unité : <b style="color:#f0a828">${unitCode}</b>`:' | (activez la couche géologique et cliquez pour détecter l\'unité)';
+  el.innerHTML=`
+    <span style="color:#888">Feuille BRGM : <b style="color:#b8903e">${sheet.code}N — ${sheet.name}</b>${unitTxt}</span><br>
+    <a href="${pdfUrl}" target="_blank" style="color:#56ccf2;text-decoration:none">
+      📄 Télécharger la notice PDF (${sheet.code}N)
+    </a>
+    &nbsp;·&nbsp;
+    <a href="${ficheUrl}" target="_blank" style="color:#56ccf2;text-decoration:none">
+      🌐 Infoterre BRGM
+    </a>
+  `;
+}
+
+// ─── Suggestions d'espèces par période ────────────────────────────────────────
+const SPECIES_DB={
+  plio:{
+    label:'Pliocène — Mollusques marins (~3,5–5,3 Ma)',
+    groups:[
+      {g:'🐚 Gastéropodes',items:['Gemmula (Unedogemmula) rotata (Brocchi, 1814)','Mitrella (Crenisutura) thiara (Brocchi, 1814)','Charonia appenninica (Sassi, 1827)','Sveltia lyrata (Brocchi, 1814)','Comitas dimidiata (Brocchi, 1814)','Nassarius bisotensis (Depontailler, 1879)','Conus (Conolithes) antidiluvianus (Bruguière, 1872)','Archimediella spirata (Brocchi, 1814)','Cancilla planicosta (Bellardi, 1887)','Epalxis (Bathytoma) cataphracta (Brocchi, 1814)']},
+      {g:'🪸 Bivalves',items:['Anadara diluvii (Lamarck, 1805)','Pecten subpusio (Michelotti, 1847)','Chlamys multistriata (Poli, 1795)']},
+      {g:'🐛 Scaphopodes',items:['Dentalium sexangulum (Gmelin, 1791)','Antalis inaequicostata (Dautzenberg, 1891)']},
+    ]
+  },
+  mio:{
+    label:'Miocène — Mollusques & Échinodermes (~5–23 Ma)',
+    groups:[
+      {g:'🦔 Échinodermes',items:['Clypeaster scillae (Desmoulins, 1835)','Echinolampas sp.','Schizaster sp.']},
+      {g:'🪸 Bivalves / Pectinidés',items:['Pecten (Flabellipecten) flabelliformis (Brocchi, 1814)','Ostrea crassissima (Lamarck, 1806)','Glycymeris obovata (Lamarck, 1805)']},
+      {g:'🐚 Gastéropodes',items:['Turritella tricarinata (Brocchi, 1814)','Xenophora cumulans (Brongniart, 1823)']},
+    ]
+  },
+  eocene:{
+    label:'Éocène (~33–56 Ma)',
+    groups:[
+      {g:'🦭 Mammifères marins',items:['Halitherium schinzi (Kaup, 1838) — sirénien','Basilosaurus sp. — cétacé']},
+      {g:'🐙 Céphalopodes',items:['Nautile sp.']},
+      {g:'Nummulites (à exclure si non souhaité)',items:['Nummulites gizehensis (Forskal, 1775)','Nummulites laevigatus (Bruguière, 1792)']},
+    ]
+  },
+  oxford:{
+    label:'Oxfordien moyen (~155–165 Ma)',
+    groups:[
+      {g:'🐙 Ammonites — Zone à Plicatilis / Transversarium',items:['Perisphinctes (Dichotomosphinctes) antecedens (Salfeld, 1914)','Perisphinctes (Perisphinctes) martelli (Oppel, 1863)','Euaspidoceras perarmatum (Bean, 1839)','Taramelliceras compsum (Oppel, 1863)','Gregoryceras transversarium (Quenstedt, 1847)','Epipeltoceras bimammatum (Quenstedt, 1847)','Idoceras planula (Hehl, 1832)']},
+      {g:'🪸 Bélemnites',items:['Hibolithes hastatus (Blainville, 1827)','Belemnopsis sp.']},
+      {g:'🐚 Bivalves',items:['Myophorella sp.','Astarte sp.','Oxytoma expansa (Phillips, 1829)']},
+      {g:'🦀 Brachiopodes',items:['Rhynchonelloidella wattonensis (Walker, 1887)','Terebratula bisuffarcinata (Schlotheim, 1820)']},
+    ]
+  },
+  callovo:{
+    label:'Callovien–Bathonien (~160–175 Ma)',
+    groups:[
+      {g:'🐙 Ammonites',items:['Macrocephalites macrocephalus (Schlotheim, 1813)','Choffatia (Choffatia) subundulata (Brauns, 1874)','Reineckeia anceps (Reinecke, 1818)','Erymnoceras coronatum (Bruguière, 1789)','Sigaloceras calloviense (Sowerby, 1822)']},
+      {g:'🪸 Bélemnites',items:['Cylindroteuthis sp.','Belemnopsis cf. bessina (d\'Orbigny, 1842)']},
+      {g:'🦔 Oursins',items:['Cidaris sp.','Glypticus hieroglyphicus (Goldfuss, 1826)']},
+    ]
+  },
+  bar:{
+    label:'Barrémien (~121–126 Ma) — Stratotype à Barrême',
+    groups:[
+      {g:'🐙 Ammonites déroulées (hétéromorphes)',items:['Emericiceras emerici (Léveillé, 1837)','Crioceratites (Crioceratites) duvali (Léveillé, 1837)','Ancyloceras matheroni (d\'Orbigny, 1842)','Pseudothurmannia angulicostata (d\'Orbigny, 1842)']},
+      {g:'🐙 Ammonites enroulées',items:['Barremites strettostoma (Uhlig, 1905)','Hemihoplites feraudianus (d\'Orbigny, 1841)','Pseudosaynella bicurvata (Michelin, 1838)','Moutoniceras (Moutoniceras) moutonianum (d\'Orbigny, 1841)']},
+      {g:'🪸 Bélemnites',items:['Duvalia dilatata (Blainville, 1827)','Pseudobelus bipartitus (Blainville, 1827)']},
+      {g:'🦔 Oursins',items:['Toxaster complanatus (Agassiz, 1840)','Heteraster oblongus (Brongniart, 1822)']},
+    ]
+  },
+  haut:{
+    label:'Hauterivien (~126–132 Ma)',
+    groups:[
+      {g:'🐙 Ammonites',items:['Acanthodiscus radiatus (Bruguière, 1789)','Lyticoceras cf. nodosoplicatum (Koenen, 1902)','Subsaynella sayni (Kilian, 1895)','Leopoldia leopoldina (d\'Orbigny, 1841)']},
+      {g:'🪸 Bélemnites',items:['Duvalia gr. dilatata (Blainville, 1827)','Pseudobelus bipartitus (Blainville, 1827)','Hibolites cf. pistilliformis (Blainville, 1827)']},
+      {g:'🐚 Bivalves',items:['Arca cf. reticulata (Münster, 1833)','Gryphaea (Bilobissa) dilobotes (Damon, 1860)']},
+    ]
+  },
+  alb:{
+    label:'Albien terminal (~100–113 Ma)',
+    groups:[
+      {g:'🐙 Ammonites hétéromorphes',items:['Mariella (Mariella) bergeri (Brongniart, 1822)','Stoliczkaia (Stoliczkaia) dispar (d\'Orbigny, 1841)','Turrilites costatus (Lamarck, 1801)','Lechites gaudini (Pictet & Campiche, 1861)']},
+      {g:'🐙 Ammonites enroulées',items:['Mortoniceras (Mortoniceras) inflatum (Sowerby, 1818)','Elobiceras elobiense (Casey, 1962)','Hoplites dentatus (Sowerby, 1821)']},
+      {g:'🐚 Bivalves',items:['Inoceramus concentricus (Parkinson, 1819)','Exogyra conica (Sowerby, 1822)']},
+    ]
+  },
+  trias:{
+    label:'Trias (~200–252 Ma) — Intérêt minéralogique',
+    groups:[
+      {g:'💎 Minéraux évaporitiques',items:['Gypse — CaSO₄·2H₂O (sélénite, albâtre, fibreux)','Anhydrite — CaSO₄ (gris compact)','Halite — NaCl (rare en surface)','Calcite — CaCO₃ (cargneules, dolomies brèchifiées)','Dolomite — CaMg(CO₃)₂']},
+      {g:'🪨 Minéraux diagénétiques',items:['Pyrite — FeS₂ (cubes automorphes dans marnes)','Marcasite — FeS₂ (formes crêtées, instable)','Quartz automorphe — SiO₂']},
+      {g:'🐙 Fossiles (rares)',items:['Myophoria kefersteini (Münster, 1833) — bivalve','Encrinus liliiformis (Lamarck, 1816) — crinoïde','Ceratites cf. nodosus (Bruguière, 1789) — ammonite (Muschelkalk)']},
+    ]
+  },
+  perm:{
+    label:'Permien (~252–298 Ma) — Cuivre natif et arséniates',
+    groups:[
+      {g:'🔴 Minéraux primaires Cu',items:['Cuivre natif — Cu (feuillets, nodules, arborescences)','Chalcopyrite — CuFeS₂ (cuivre jaune métal)','Bornite — Cu₅FeS₄ (peacock ore, irisé violet-bleu)','Algodonite — Cu₆As (alliage Cu-As)','Domeykite — Cu₃As','Koutékite — (Cu,Ni)₅As₂']},
+      {g:'🟢 Arséniates secondaires (TL Roua)',items:['Gilmarite — Cu₃(AsO₄)(OH)₃ [TL 1996]','Rollandite — Cu₃(AsO₄)₂·4H₂O [TL 1998]','Rouaite — Cu₂(NO₃)(OH)₃ [TL 1999]','Wallkilldellite-(Fe) — (Ca,Cu)₄Fe₆(AsO₄)₄·18H₂O [TL 1997]','Barrotite [TL récent]','Adamite — Zn₂(AsO₄)(OH)','Cornwallite — Cu₅(AsO₄)₂(OH)₄']},
+      {g:'🔵 Carbonates de Cu',items:['Malachite — Cu₂(CO₃)(OH)₂ (vert)','Azurite — Cu₃(CO₃)₂(OH)₂ (bleu intense)','Cuprite — Cu₂O (rouge profond)']},
+    ]
+  },
+  socle:{
+    label:'Socle cristallin varisque — Filons métalliques',
+    groups:[
+      {g:'⚫ Sulfures',items:['Galène — PbS (plomb argentifère)','Sphalérite / Blende — ZnS (minerai de zinc)','Chalcopyrite — CuFeS₂','Pyrite — FeS₂','Pyrrhotite — Fe(1-x)S','Arsenopyrite — FeAsS','Molybdénite — MoS₂','Bournonite — CuPbSbS₃','Ménéghinite — CuPb₁₃Sb₇S₂₄']},
+      {g:'💜 Fluorite et minéraux associés',items:['Fluorite — CaF₂ (cubique, multicolore)','Baryte — BaSO₄ (tablettes blanches)','Proustite — Ag₃AsS₃ (rubis argentifère)','Acanthite — Ag₂S','Stéphanite — Ag₅SbS₄']},
+      {g:'🟢 Altération',items:['Malachite — Cu₂(CO₃)(OH)₂','Azurite — Cu₃(CO₃)₂(OH)₂','Cérussite — PbCO₃','Anglésite — PbSO₄','Smithsonite — ZnCO₃']},
+    ]
+  },
+  lias:{
+    label:'Jurassique inférieur — Lias (~175–200 Ma)',
+    groups:[
+      {g:'🐙 Ammonites',items:['Coroniceras multicostatum (Sowerby, 1826) — Sinémurien','Arietites bucklandi (Sowerby, 1817)','Amaltheus margaritatus (Montfort, 1808) — Domérien','Dactylioceras commune (Sowerby, 1815) — Toarcien','Hildoceras bifrons (Bruguière, 1789) — Toarcien']},
+      {g:'🪸 Bélemnites',items:['Passaloteuthis paxillosa (Schlotheim, 1813)','Acrocoelites sp.']},
+      {g:'🐚 Bivalves',items:['Gryphaea arcuata (Lamarck, 1801)','Plagiostoma giganteum (Sowerby, 1814)','Plicatula spinosa (Sowerby, 1818)']},
+    ]
+  },
+  berval:{
+    label:'Valanginien–Berriasien (~132–145 Ma)',
+    groups:[
+      {g:'🐙 Ammonites',items:['Berriasella jacobi (Kilian, 1895)','Neocomites neocomiensis (d\'Orbigny, 1840)','Kilianella pexiptycha (Uhlig, 1883)']},
+      {g:'🪸 Bélemnites',items:['Pseudobelus sp.','Duvalia sp.']},
+    ]
+  },
+  titho:{
+    label:'Tithonien–Kimméridgien (~145–157 Ma)',
+    groups:[
+      {g:'🐙 Ammonites',items:['Hybonoticeras beckeri (Neumayr, 1873)','Progeronia cf. grossouvrei (Siemiradzki, 1898)','Waagenia beckeri (Neumayr, 1873)','Virgalites cf. virgatus (Bukowski, 1887)']},
+    ]
+  },
+  cretsup:{
+    label:'Crétacé supérieur (~66–100 Ma)',
+    groups:[
+      {g:'🐙 Ammonites',items:['Mammites nodosoides (Schlüter, 1871) — Turonien','Lewesiceras mantelli (d\'Orbigny, 1840)']},
+      {g:'🐚 Mollusques',items:['Inoceramus labiatus (Schlotheim, 1813)','Hippurites radiosus (Desm., 1814) — rudiste']},
+    ]
+  },
+  quat:{
+    label:'Quaternaire (< 2,6 Ma) — Alluvions / dépôts de pente',
+    groups:[
+      {g:'🦴 Faune actuelle / sub-actuelle',items:['Restes de vertébrés (os fragmentaires)','Mollusques continentaux actuels ou sub-fossiles']},
+      {g:'💎 Minéraux des alluvions',items:['Quartz roulé — SiO₂','Grenats alluviaux','Magnétite — Fe₃O₄ (sable noir)']},
+    ]
+  },
+};
+
+function applySpeciesSuggestion(key){
+  const db=SPECIES_DB[key];
+  if(!db) return;
+  // Pré-remplir le textarea avec le format structuré
+  const lines=db.groups.map(g=>{
+    return g.g+' :\n'+g.items.slice(0,4).map(i=>'  · '+i).join('\n');
+  }).join('\n\n');
+  document.getElementById('fSpecies').value=lines;
+}
+
+function showSpeciesSuggest(){
+  const key=document.getElementById('fSuggKey').value;
+  if(!key){alert('Aucune suggestion disponible (aucune unité géologique détectée). Choisissez une période manuellement.');return;}
+  applySpeciesSuggestion(key);
+}
+
+function showFullSuggestPanel(){
+  const key=document.getElementById('fSuggKey').value||'oxford';
+  const db=SPECIES_DB[key];
+  if(!db){showToast('Aucune base de données pour cette période','#f59e0b');return;}
+  const panel=document.getElementById('speciesSuggestPanel');
+  if(panel.style.display!=='none'){panel.style.display='none';return;}
+  panel.innerHTML=`<div style="font-weight:700;color:#f0a828;margin-bottom:6px;font-size:.7rem">${db.label}</div>`+
+  db.groups.map(g=>`
+    <div style="margin-bottom:6px">
+      <div style="font-size:.65rem;font-weight:700;color:#b8903e;margin-bottom:3px">${g.g}</div>
+      ${g.items.map(item=>`<div class="species-item" onclick="appendSpecies('${item.replace(/'/g,"\\'")}')">${item}</div>`).join('')}
+    </div>
+  `).join('');
+  panel.style.display='block';
+}
+
+function appendSpecies(item){
+  const ta=document.getElementById('fSpecies');
+  const v=ta.value;
+  ta.value=v+(v&&!v.endsWith('\n')?'\n  · ':v?'  · ':'')+item;
+  ta.focus();
+}
+
+// ─── Toast notification ────────────────────────────────────────────────────────
+let toastTimeout;
+function showToast(msg, color='#b8903e'){
+  let t=document.getElementById('toastEl');
+  if(!t){
+    t=document.createElement('div');
+    t.id='toastEl';
+    t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:9999;background:#181830;border:2px solid;border-radius:8px;padding:8px 16px;font-size:.72rem;font-weight:600;pointer-events:none;transition:opacity .3s;max-width:80vw;text-align:center';
+    document.body.appendChild(t);
+  }
+  t.style.borderColor=color;
+  t.style.color=color;
+  t.textContent=msg;
+  t.style.opacity='1';
+  clearTimeout(toastTimeout);
+  toastTimeout=setTimeout(()=>{ t.style.opacity='0'; },3000);
+}
+</script>
 </body>
 </html>

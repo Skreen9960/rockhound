@@ -17,3 +17,5 @@ Thumbs.db
 # Éditeurs
 .vscode/
 *.swp
+
+.vercel
