@@ -738,6 +738,21 @@ const layers={
 const lSt={ign:true,osm:true,sat:false,brgm:true,litho:false,fault:false,struct:false};
 layers.ign.addTo(map);layers.osm.addTo(map);layers.brgm.addTo(map);
 
+// Dégradation gracieuse : erreurs tuiles fond de carte
+let tileErrShown=false;
+['ign','osm','sat'].forEach(k=>{
+  layers[k].on('tileerror',()=>{
+    if(!tileErrShown){tileErrShown=true;showToast('Fond de carte hors ligne — les marqueurs restent accessibles','#eb5757');}
+  });
+});
+// Dégradation gracieuse : erreurs tuiles WMS BRGM
+let brgmErrShown=false;
+['brgm','litho','fault','struct'].forEach(k=>{
+  layers[k].on('tileerror',()=>{
+    if(!brgmErrShown){brgmErrShown=true;showToast('Données BRGM temporairement indisponibles','#f2994a');}
+  });
+});
+
 const grps={p:L.layerGroup(),mi:L.layerGroup(),f30:L.layerGroup(),f90:L.layerGroup(),m30:L.layerGroup(),m90:L.layerGroup(),vol:L.layerGroup(),z:L.layerGroup(),custom:L.layerGroup()};
 Object.values(grps).forEach(g=>g.addTo(map));
 
@@ -916,21 +931,41 @@ function toggleEdit(){
   if(!editMode) showToast('Mode édition désactivé · Toutes les positions sont sauvegardées','#22c55e');
 }
 
-// Clic sur la carte en mode édition → requête BRGM puis ouverture formulaire
+// Clic sur la carte → identification géologique (normal) ou ajout site (édition)
 map.on('click', async function(e){
-  if(!editMode) return;
-  // Si un marqueur est en cours de drag, ignorer
   const spinEl = document.getElementById('editSpinner');
   if(spinEl) spinEl.style.display='flex';
   try {
     const info = await queryBRGM(e.latlng);
-    openNewModal(e.latlng, info);
+    if(editMode){
+      openNewModal(e.latlng, info);
+    } else {
+      showGeologyPopup(e.latlng, info);
+    }
   } catch(err){
-    openNewModal(e.latlng, null);
+    if(editMode) openNewModal(e.latlng, null);
+    else showGeologyPopup(e.latlng, null);
   } finally {
     if(spinEl) spinEl.style.display='none';
   }
 });
+
+function showGeologyPopup(latlng, info){
+  let content;
+  if(!info){
+    content=`<div class="pt">🌍 Identification BRGM</div><div class="pb" style="color:#eb5757">Données géologiques BRGM temporairement indisponibles.</div>`;
+  } else if(!info.age && !info.unitCode){
+    const s=info.sheet;
+    content=`<div class="pt">🌍 ${s?s.name:'Hors zone PACA'}</div><div class="pb" style="color:#888">Pas de données BRGM pour ce point.</div>`;
+  } else {
+    const emoji=info.emoji||'🪨';
+    const age=info.age||'';
+    const unit=info.unitCode?`<br><span style="color:#557;font-size:.6rem">Unité ${info.unitCode}${info.unitName?' — '+info.unitName:''}</span>`:'';
+    const sheet=info.sheet?`<br><span style="color:#557;font-size:.6rem">Feuille BRGM : ${info.sheet.name}</span>`:'';
+    content=`<div class="pt">${emoji} Géologie BRGM</div><div class="pb">${age}${unit}${sheet}</div>`;
+  }
+  L.popup().setLatLng(latlng).setContent(content).openOn(map);
+}
 
 // ─── MODAL ────────────────────────────────────────────────────────────────────
 function openNewModal(latlng, brgmInfo=null){
@@ -1216,53 +1251,33 @@ L.control.scale({imperial:false}).addTo(map);
 // Keyboard shortcut: Escape ferme modal
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 
-// ─── BRGM GetFeatureInfo ───────────────────────────────────────────────────────
+// ─── BRGM GetFeatureInfo via proxy ────────────────────────────────────────────
 async function queryBRGM(latlng){
   const {lat,lng}=latlng;
-  // Bbox de 500m autour du point
-  const d=0.005;
-  const bbox=`${lat-d},${lng-d},${lat+d},${lng+d}`;
-  const url=`https://geoservices.brgm.fr/geologie?`+
-    `SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo`+
-    `&LAYERS=GEOLOGIE&QUERY_LAYERS=GEOLOGIE`+
-    `&CRS=EPSG%3A4326&BBOX=${bbox}`+
-    `&WIDTH=101&HEIGHT=101&I=50&J=50`+
-    `&INFO_FORMAT=text%2Fhtml`;
-  let raw='';
   try{
-    const r=await fetch(url,{mode:'cors',signal:AbortSignal.timeout(5000)});
-    raw=await r.text();
+    const r=await fetch(`/api/brgm?lat=${lat}&lng=${lng}`,{signal:AbortSignal.timeout(9000)});
+    if(!r.ok) throw new Error(`proxy ${r.status}`);
+    const json=await r.json();
+    if(!json.ok) throw new Error(json.error||'proxy error');
+    return parseBRGMResponse(json.data,latlng);
   }catch(err){
-    console.warn('[BRGM] GetFeatureInfo failed:',err.message);
-    // Fallback : utilise la feuille locale
+    console.warn('[BRGM] proxy failed:',err.message);
     const sheet=findSheetForCoords(lat,lng);
     return sheet?{sheet,age:'',suggestionKey:null,unitCode:null}:null;
   }
-  return parseBRGMResponse(raw,latlng);
 }
 
-function parseBRGMResponse(html,latlng){
-  if(!html||html.length<30) return null;
-  // Extrait les paires clé=valeur du tableau HTML renvoyé par BRGM
+function parseBRGMResponse(geojson,latlng){
+  if(!geojson||!geojson.features||!geojson.features.length) return null;
+  const props=geojson.features[0].properties||{};
   const cells={};
-  const rows=html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)||[];
-  rows.forEach(row=>{
-    const tds=row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)||[];
-    if(tds.length>=2){
-      const k=tds[0].replace(/<[^>]+>/g,'').trim().toUpperCase();
-      const v=tds[1].replace(/<[^>]+>/g,'').trim();
-      if(k) cells[k]=v;
-    }
-  });
-  // Cherche les champs BRGM communs (notation, description, code_legende, etc.)
+  Object.keys(props).forEach(k=>{ cells[k.toUpperCase()]=String(props[k]||''); });
+
   const notation = cells['NOTATION']||cells['CODE']||cells['CODE_LEGENDE']||cells['SYMBOL']||'';
   const desc     = cells['DESCRIPTION']||cells['NOM_LEGENDE']||cells['LEGENDE']||cells['LIBELLE']||'';
   const nomCarte = cells['NOM_CARTE']||cells['FEUILLE']||cells['NUMERO']||'';
 
-  // Feuille de référence
   const sheet = nomCarte ? guessBRGMSheet(nomCarte) : findSheetForCoords(latlng.lat, latlng.lng);
-
-  // Déduction de l'âge et des suggestions depuis la notation
   const mapped = mapNotationToAge(notation, desc);
 
   return {
