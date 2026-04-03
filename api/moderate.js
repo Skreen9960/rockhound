@@ -22,7 +22,7 @@ async function writeBlob(filename, data) {
   for (const blob of blobs.blobs) {
     await del(blob.url);
   }
-  await put(filename, JSON.stringify(data), { access: 'public', contentType: 'application/json' });
+  await put(filename, JSON.stringify(data), { access: 'private', contentType: 'application/json' });
 }
 
 function page(title, msg, color) {
