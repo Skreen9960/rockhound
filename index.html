@@ -203,6 +203,7 @@ header{background:linear-gradient(135deg,#1a1005,#0d2a1a);padding:7px 14px;displ
       <div class="tab" onclick="sT('meso')">🐙 Méso.</div>
       <div class="tab" onclick="sT('mines')">⛏️ Mines</div>
       <div class="tab" onclick="sT('custom')">📍 Mes sites</div>
+      <div class="tab" onclick="sT('contribute')">📤 Proposer</div>
       <div class="tab" onclick="sT('legend')">📖 Légende</div>
     </div>
 
@@ -274,6 +275,49 @@ header{background:linear-gradient(135deg,#1a1005,#0d2a1a);padding:7px 14px;displ
         <button class="io-btn" style="border-color:#eb5757;color:#eb5757" onclick="confirmClearCustom()">🗑️ Tout effacer</button>
       </div>
       <div id="list-custom"><div class="ibox" style="color:#555;text-align:center">Aucun site personnalisé.<br>Activez le mode édition ✏️ puis cliquez sur la carte.</div></div>
+    </div>
+
+    <!-- CONTRIBUER -->
+    <div class="tc" id="tc-contribute">
+      <div class="ibox">
+        <b style="color:#b8903e">Proposer un site de prospection</b><br>
+        <span style="font-size:.63rem;color:#777">Votre soumission sera visible après validation. <br>Cliquez sur la carte pour remplir les coordonnées.</span>
+      </div>
+      <div class="form-row">
+        <label>Nom du site *</label>
+        <input type="text" id="cName" maxlength="100" placeholder="ex: Carrière des Moulières">
+      </div>
+      <div class="form-row">
+        <label>Coordonnées GPS * <span style="color:#b8903e;font-size:.6rem" id="cPickHint">← cliquez la carte</span></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+          <input type="number" id="cLat" step="0.00001" min="43" max="46" placeholder="Lat (43–46)" onblur="lookupBrgmContrib()">
+          <input type="number" id="cLng" step="0.00001" min="4" max="8" placeholder="Lng (4–8)" onblur="lookupBrgmContrib()">
+        </div>
+        <div id="cBrgmInfo" style="margin-top:3px;font-size:.62rem;color:#b8903e;display:none"></div>
+      </div>
+      <div class="form-row">
+        <label>Catégorie *</label>
+        <select id="cCategory">
+          <option value="fossils">🐙 Fossiles (Mésozoïque)</option>
+          <option value="cenozoic">🐚 Cénozoïque (Plio/Mio)</option>
+          <option value="mines">⛏️ Mines / Minéraux</option>
+          <option value="volcanic">🌋 Volcanique</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Description *</label>
+        <textarea id="cDesc" rows="3" maxlength="500" placeholder="Accès, ce qu'on peut y trouver, période…" style="width:100%;background:#08080f;border:1px solid #2a2a3e;color:#e8e0d0;border-radius:4px;padding:5px 7px;font-size:.67rem;resize:vertical"></textarea>
+      </div>
+      <div class="form-row">
+        <label>Espèces / Minéraux <span style="color:#557;font-size:.6rem">(séparés par virgules)</span></label>
+        <input type="text" id="cSpecies" placeholder="ex: Ammonites, Bélemnites · ou Malachite, Azurite">
+      </div>
+      <div class="form-row">
+        <label>Source / Référence <span style="color:#b8903e;font-size:.6rem">fortement conseillé</span></label>
+        <input type="text" id="cSource" placeholder="ex: BRGM BD-CHARM-50, Mindat loc-1234, visite 2024">
+      </div>
+      <button onclick="submitContribution()" id="cSubmitBtn" style="width:100%;padding:8px;background:transparent;border:2px solid #b8903e;color:#b8903e;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;margin-top:4px">📤 Envoyer la proposition</button>
+      <div id="cResult" style="margin-top:6px;font-size:.67rem;padding:6px;border-radius:4px;display:none"></div>
     </div>
 
   </div><!-- /panel -->
@@ -982,8 +1026,15 @@ function toggleEdit(){
   if(!editMode) showToast('Mode édition désactivé · Toutes les positions sont sauvegardées','#22c55e');
 }
 
-// Clic sur la carte → identification géologique (normal) ou ajout site (édition)
+// Clic sur la carte → selon le mode actif
 map.on('click', async function(e){
+  // Mode contribution : remplir les coordonnées du formulaire
+  if(document.getElementById('tc-contribute')?.classList.contains('active')){
+    document.getElementById('cLat').value=e.latlng.lat.toFixed(6);
+    document.getElementById('cLng').value=e.latlng.lng.toFixed(6);
+    lookupBrgmContrib();
+    return;
+  }
   const spinEl = document.getElementById('editSpinner');
   if(spinEl) spinEl.style.display='flex';
   try {
@@ -1291,7 +1342,7 @@ function tM(t){
 }
 function sT(n){
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    const ns=['layers','plio','meso','mines','custom','legend'];
+    const ns=['layers','plio','meso','mines','custom','contribute','legend'];
     t.classList.toggle('active',ns[i]===n);
   });
   document.querySelectorAll('.tc').forEach(c=>c.classList.toggle('active',c.id==='tc-'+n));
@@ -1613,6 +1664,97 @@ function appendSpecies(item){
   ta.value=v+(v&&!v.endsWith('\n')?'\n  · ':v?'  · ':'')+item;
   ta.focus();
 }
+
+// ─── CONTRIBUTIONS COMMUNAUTAIRES ─────────────────────────────────────────────
+async function lookupBrgmContrib(){
+  const lat=parseFloat(document.getElementById('cLat').value);
+  const lng=parseFloat(document.getElementById('cLng').value);
+  const el=document.getElementById('cBrgmInfo');
+  if(isNaN(lat)||isNaN(lng)){el.style.display='none';return;}
+  el.style.display='block';
+  el.textContent='Interrogation BRGM…';
+  const info=await queryBRGM({lat,lng});
+  if(info&&info.age){
+    el.textContent=`🌍 BRGM : ${info.age}${info.unitCode?' — unité '+info.unitCode:''}`;
+  } else {
+    el.textContent='🌍 BRGM : pas de données pour ce point.';
+  }
+}
+
+async function submitContribution(){
+  const btn=document.getElementById('cSubmitBtn');
+  const res=document.getElementById('cResult');
+  const name=document.getElementById('cName').value.trim();
+  const lat=document.getElementById('cLat').value;
+  const lng=document.getElementById('cLng').value;
+  const category=document.getElementById('cCategory').value;
+  const desc=document.getElementById('cDesc').value.trim();
+  const species=document.getElementById('cSpecies').value.trim();
+  const source=document.getElementById('cSource').value.trim();
+
+  if(!name||!lat||!lng||!desc){
+    res.style.display='block';
+    res.style.background='#3a1a00';
+    res.style.color='#f59e0b';
+    res.textContent='⚠️ Remplissez les champs obligatoires : nom, coordonnées, description.';
+    return;
+  }
+
+  btn.disabled=true;
+  btn.textContent='Envoi en cours…';
+  res.style.display='none';
+
+  try{
+    const r=await fetch('/api/submit',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,lat:parseFloat(lat),lng:parseFloat(lng),category,description:desc,species,source}),
+    });
+    const json=await r.json();
+    res.style.display='block';
+    if(json.ok){
+      res.style.background='#0a1a0a';
+      res.style.color='#22c55e';
+      res.textContent='✅ '+json.message;
+      // Réinitialiser le formulaire
+      ['cName','cLat','cLng','cDesc','cSpecies','cSource'].forEach(id=>{document.getElementById(id).value='';});
+      document.getElementById('cBrgmInfo').style.display='none';
+    } else {
+      res.style.background='#3a1a00';
+      res.style.color='#eb5757';
+      res.textContent='❌ '+json.error;
+    }
+  }catch(e){
+    res.style.display='block';
+    res.style.background='#3a1a00';
+    res.style.color='#eb5757';
+    res.textContent='❌ Erreur réseau. Réessayez.';
+  }finally{
+    btn.disabled=false;
+    btn.textContent='📤 Envoyer la proposition';
+  }
+}
+
+// ─── MARQUEURS PENDING (en attente de validation) ─────────────────────────────
+const PENDING_MKS={};
+
+function addPendingMarker(s){
+  const emoji=s.emoji||emojiForType(s.type||s.t||'custom');
+  const icon=L.divIcon({className:'',html:`<div style="width:30px;height:30px;background:#f59e0b22;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.88rem;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px dashed #f59e0b;">${emoji}</div>`,iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-17]});
+  const m=L.marker([s.lat,s.lng],{icon});
+  m.bindPopup(`<div class="pt">${emoji} ${s.name||s.n}</div><div class="pb" style="color:#f59e0b;font-size:.62rem">⏳ En attente de validation</div><div class="pb">${s.description||s.d||''}</div>`);
+  m.addTo(map);
+  PENDING_MKS[s.id]=m;
+}
+
+(async()=>{
+  try{
+    const r=await fetch('/api/pending',{signal:AbortSignal.timeout(5000)});
+    if(!r.ok) return;
+    const json=await r.json();
+    if(json.ok&&json.data) json.data.forEach(addPendingMarker);
+  }catch(e){}
+})();
 
 // ─── Toast notification ────────────────────────────────────────────────────────
 let toastTimeout;
