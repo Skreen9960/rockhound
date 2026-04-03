@@ -132,6 +132,6 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('[submit]', err);
-    return res.status(500).json({ ok: false, error: 'Erreur serveur. Réessaie dans un instant.' });
+    return res.status(500).json({ ok: false, error: err.message || String(err) });
   }
 }
