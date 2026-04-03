@@ -328,10 +328,8 @@ header{background:linear-gradient(135deg,#1a1005,#0d2a1a);padding:7px 14px;displ
       <div class="form-row">
         <label>Catégorie *</label>
         <select id="cCategory">
-          <option value="fossils">🐙 Fossiles (Mésozoïque)</option>
-          <option value="cenozoic">🐚 Cénozoïque (Plio/Mio)</option>
-          <option value="mines">⛏️ Mines / Minéraux</option>
-          <option value="volcanic">🌋 Volcanique</option>
+          <option value="fossils">🐚 Fossiles</option>
+          <option value="mines">⛏️ Minéraux / Mines</option>
         </select>
       </div>
       <div class="form-row">
@@ -1037,19 +1035,27 @@ map.on('click', async function(e){
     lookupBrgmContrib();
     return;
   }
-  const spinEl = document.getElementById('editSpinner');
+
+  if(!editMode){
+    // Affiche le modal IMMÉDIATEMENT avec les données locales (feuille BRGM)
+    // puis enrichit en arrière-plan si l'API répond
+    const localInfo={sheet:findSheetForCoords(e.latlng.lat,e.latlng.lng),age:'',unitCode:null,suggestionKey:null};
+    showGeoModal(e.latlng,localInfo);
+    queryBRGM(e.latlng).then(info=>{
+      if(info&&(info.age||info.unitCode)) showGeoModal(e.latlng,info);
+    }).catch(()=>{});
+    return;
+  }
+
+  // Mode édition : spinner + API avant d'ouvrir le formulaire
+  const spinEl=document.getElementById('editSpinner');
   if(spinEl) spinEl.style.display='flex';
-  try {
-    const info = await queryBRGM(e.latlng);
-    if(editMode){
-      openNewModal(e.latlng, info);
-    } else {
-      showGeologyPopup(e.latlng, info);
-    }
-  } catch(err){
-    if(editMode) openNewModal(e.latlng, null);
-    else showGeologyPopup(e.latlng, null);
-  } finally {
+  try{
+    const info=await queryBRGM(e.latlng);
+    openNewModal(e.latlng,info);
+  }catch(err){
+    openNewModal(e.latlng,null);
+  }finally{
     if(spinEl) spinEl.style.display='none';
   }
 });
@@ -1065,7 +1071,7 @@ function showGeoModal(latlng, info){
   const sheet=info?.sheet||findSheetForCoords(latlng.lat,latlng.lng);
   const noticeHtml=sheet
     ?`<div class="detail-section"><h4>Notice géologique BRGM</h4>
-       <a class="detail-notice" href="https://ficheinfoterre.brgm.fr/Notices/${sheet.code}N.pdf" target="_blank">📄 Notice ${sheet.code}N — ${sheet.name}</a>
+       <a class="detail-notice" href="https://infoterre.brgm.fr/notices/${sheet.code}N.pdf" target="_blank">📄 Notice ${sheet.code}N — ${sheet.name}</a>
        <div style="font-size:.6rem;color:#557;margin-top:5px">Feuille 1:50 000 · Description des formations, faune associée, historique minier.</div></div>`
     :'';
 
@@ -1368,7 +1374,7 @@ function showSiteDetail(id){
 
   // BRGM notice
   const sheet=findSheetForCoords(s.lat,s.lng);
-  const noticeHtml=sheet?`<div class="detail-section"><h4>Notice géologique BRGM</h4><a class="detail-notice" href="https://ficheinfoterre.brgm.fr/Notices/${sheet.code}N.pdf" target="_blank">📄 Notice ${sheet.code}N — ${sheet.name}</a><div style="font-size:.6rem;color:#557;margin-top:5px">Feuille 1:50 000 · Contient la description complète des formations, faune associée, historique.</div></div>`:'';
+  const noticeHtml=sheet?`<div class="detail-section"><h4>Notice géologique BRGM</h4><a class="detail-notice" href="https://infoterre.brgm.fr/notices/${sheet.code}N.pdf" target="_blank">📄 Notice ${sheet.code}N — ${sheet.name}</a><div style="font-size:.6rem;color:#557;margin-top:5px">Feuille 1:50 000 · Contient la description complète des formations, faune associée, historique.</div></div>`:'';
 
   // Warnings
   const warnings=renderSiteWarnings(s);
@@ -1608,7 +1614,7 @@ function updateNoticeLinks(sheet, unitCode){
   const el=document.getElementById('noticeLinksPanel');
   if(!el)return;
   if(!sheet){el.innerHTML='<span style="color:#555">Feuille non détectée — vérifier les coordonnées</span>';return;}
-  const pdfUrl=`https://ficheinfoterre.brgm.fr/Notices/${sheet.code}N.pdf`;
+  const pdfUrl=`https://infoterre.brgm.fr/notices/${sheet.code}N.pdf`;
   const ficheUrl=`https://infoterre.brgm.fr/viewer/MainTileForward.do?rub=30`;
   const unitTxt=unitCode?` | Unité : <b style="color:#f0a828">${unitCode}</b>`:' | (activez la couche géologique et cliquez pour détecter l\'unité)';
   el.innerHTML=`
