@@ -776,6 +776,36 @@ Object.values(grps).forEach(g=>g.addTo(map));
 L.circle([43.710,7.262],{radius:28000,color:'#22c55e',weight:1.2,dashArray:'8 5',fillOpacity:.025,fillColor:'#22c55e'}).addTo(map);
 L.circle([43.710,7.262],{radius:85000,color:'#f2994a',weight:1,dashArray:'8 5',fillOpacity:.012,fillColor:'#f2994a'}).addTo(map);
 
+// ─── NORMALISATION SCHÉMA ─────────────────────────────────────────────────────
+// Convertit le nouveau schéma JSON (catalogue API) vers le format interne utilisé par addMarker/cardHTML
+function normalizeSite(s){
+  if(s._n) return s; // déjà normalisé
+  return Object.assign({},s,{
+    _n:true,
+    n: s.name||s.n||'',
+    d: s.description||s.d||'',
+    a: s.subtitle||s.a||'',
+    t: s.type||s.t||'custom',
+    src: s.source||s.src||null,
+    tl: s.tags||s.tl||[],
+    species: Array.isArray(s.species)?s.species.join(' · '):(s.species||''),
+  });
+}
+
+// Avertissements réglementaires et toxicité (FR15, FR16, FR31 / ARCH10)
+function renderSiteWarnings(s){
+  let w='';
+  if(s.hasToxicMinerals&&s.toxicMinerals&&s.toxicMinerals.length){
+    w+=`<div style="margin-top:4px;padding:3px 6px;background:#3a1500;border:1px solid #f59e0b;border-radius:4px;font-size:.62rem;color:#f59e0b">⚠️ Minéraux potentiellement toxiques : ${s.toxicMinerals.join(', ')}. Ne pas inhaler la poussière. Se laver les mains.</div>`;
+  }
+  if(s.isProtectedZone&&s.protectedZoneName){
+    w+=`<div style="margin-top:4px;padding:3px 6px;background:#1a0000;border:1px solid #eb5757;border-radius:4px;font-size:.62rem;color:#eb5757">🚫 Zone protégée — ${s.protectedZoneName}. L'extraction est interdite ou réglementée.</div>`;
+  } else if(!s.isProtectedZone&&(s.category==='mines'||s.t==='m30'||s.t==='m90')){
+    w+=`<div style="margin-top:4px;padding:3px 6px;background:#0a1000;border:1px solid #22c55e44;border-radius:4px;font-size:.62rem;color:#558">ℹ️ Vérifier la réglementation locale avant tout prélèvement.</div>`;
+  }
+  return w;
+}
+
 // ─── MARKER FACTORY ────────────────────────────────────────────────────────────
 function mkIcon(t, emoji, isCustom=false){
   const c=C[t]||'#56ccf2';
@@ -848,11 +878,12 @@ function formatSpeciesPopup(str){
   return str.split('·').map(x=>`<span style="display:inline-block;margin:1px 3px 1px 0;font-style:italic">${x.trim()}</span>`).join(' · ');
 }
 
-BASE_SITES.forEach(s=>addMarker(s,false));
+// ─── CATALOGUE (chargé depuis /api/catalogue, fallback BASE_SITES) ────────────
+let catalogueSites = BASE_SITES.map(normalizeSite);
 
 // ─── CUSTOM SITES (localStorage) ──────────────────────────────────────────────
 function loadCustomSites(){
-  try{ return JSON.parse(localStorage.getItem('geo_nice_custom')||'[]'); }
+  try{ return JSON.parse(localStorage.getItem('geo_nice_custom')||'[]').map(normalizeSite); }
   catch(e){ return []; }
 }
 function saveCustomSites(arr){
@@ -860,7 +891,6 @@ function saveCustomSites(arr){
 }
 
 let customSites = loadCustomSites();
-customSites.forEach(s=>addMarker(s,true));
 
 function renderAllLists(){
   renderList('plio', ['p','mi']);
@@ -871,14 +901,14 @@ function renderAllLists(){
 }
 
 function updateCounter(){
-  const n=BASE_SITES.length+customSites.length;
+  const n=catalogueSites.length+customSites.length;
   document.getElementById('site-count').textContent=n+' sites';
 }
 
 function renderList(tab, types){
   const el=document.getElementById('list-'+tab);
   if(!el)return;
-  const sites=BASE_SITES.filter(s=>types.includes(s.t));
+  const sites=catalogueSites.filter(s=>types.includes(s.t));
   el.innerHTML=sites.map(s=>cardHTML(s,false)).join('');
 }
 
@@ -895,12 +925,14 @@ function renderCustomList(){
 function cardHTML(s, isCustom){
   const emoji=s.emoji||emojiForType(s.t);
   const tags=(s.tl||[]).map(tl=>`<span class="tag tf">${tl}</span>`).join('');
-  const species=s.species?`<ul class="sl">${s.species.split('·').map(x=>`<li><i>${x.trim()}</i></li>`).join('')}</ul>`:'';
+  const specStr=Array.isArray(s.species)?s.species.join(' · '):(s.species||'');
+  const species=specStr?`<ul class="sl">${specStr.split('·').map(x=>`<li><i>${x.trim()}</i></li>`).join('')}</ul>`:'';
   const src=s.src?`<div class="src">${s.src}</div>`:'';
   const notes=s.notes?`<div style="font-size:.62rem;color:#76b;margin-top:4px">🔒 ${s.notes}</div>`:'';
   const customBadge=isCustom?`<span class="custom-badge">personnel</span>`:'';
   const editBtn=isCustom?`<button class="card-edit-btn" onclick="event.stopPropagation();openEditModal('${s.id}')">✏️ Modifier</button>`:'';
-  return `<div class="card${isCustom?' custom':''}" data-min="${s.min||0}" data-id="${s.id}" onclick="focusSite('${s.id}')">
+  const warnings=renderSiteWarnings(s);
+  return `<div class="card${isCustom?' custom':''}" data-min="${s.min||s.distanceMinutes||0}" data-id="${s.id}" onclick="focusSite('${s.id}')">
     ${editBtn}
     <div class="ch"><div class="ci">${emoji}</div><div>
       <div class="ct">${s.n}${customBadge}</div>
@@ -909,11 +941,30 @@ function cardHTML(s, isCustom){
     <div>${tags}</div>
     <div class="coo">${s.lat.toFixed(5)}°N ${s.lng.toFixed(5)}°E</div>
     <div class="cb">${s.d}</div>
-    ${species}${src}${notes}
+    ${species}${src}${notes}${warnings}
   </div>`;
 }
 
+// Chargement initial depuis fallback, puis remplacement par API
+catalogueSites.forEach(s=>addMarker(s,false));
+customSites.forEach(s=>addMarker(s,true));
 renderAllLists();
+
+// Rafraîchissement depuis l'API (silencieux si indisponible)
+(async()=>{
+  try{
+    const r=await fetch('/api/catalogue',{signal:AbortSignal.timeout(5000)});
+    if(!r.ok) return;
+    const json=await r.json();
+    if(!json.ok||!json.data||!json.data.length) return;
+    const fromApi=json.data.map(normalizeSite);
+    // Retire les marqueurs BASE_SITES et remplace par données API
+    catalogueSites.forEach(s=>{ if(MKS[s.id]){ MKS[s.id].remove(); delete MKS[s.id]; } });
+    catalogueSites=fromApi;
+    catalogueSites.forEach(s=>addMarker(s,false));
+    renderAllLists();
+  }catch(e){ /* API indisponible — on garde BASE_SITES */ }
+})();
 
 // ─── EDIT MODE ─────────────────────────────────────────────────────────────────
 function toggleEdit(){
