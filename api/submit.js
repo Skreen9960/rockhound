@@ -52,6 +52,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ ok: false, error: 'Trop de soumissions. Réessaie dans une minute.' });
   }
 
+  try {
   const { name, lat, lng, category, description, species, minerals, source } = req.body || {};
 
   if (!name?.trim() || !lat || !lng || !description?.trim()) {
@@ -128,4 +129,9 @@ export default async function handler(req, res) {
   }).catch(e => console.warn('[Resend]', e.message));
 
   return res.status(200).json({ ok: true, message: 'Site soumis. Il sera visible après validation.' });
+
+  } catch (err) {
+    console.error('[submit]', err);
+    return res.status(500).json({ ok: false, error: 'Erreur serveur. Réessaie dans un instant.' });
+  }
 }
