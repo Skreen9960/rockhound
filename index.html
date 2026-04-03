@@ -219,47 +219,34 @@ header{background:linear-gradient(135deg,#1a1005,#0d2a1a);padding:7px 14px;displ
 <header>
   <div class="htitle">
     <h1>🪨 RockHound — Prospection PACA <span style="color:#b8903e">v1</span></h1>
-    <p>Fossiles · Minéraux · Mines · BRGM · IGN · <span style="color:#56ccf2">Éditeur intégré</span></p>
+    <p>Fossiles · Minéraux · Mines · BRGM · IGN</p>
   </div>
   <div class="hbadges">
     <span class="hb" id="site-count">26 sites</span>
     <span class="hb">GPS précis</span>
     <span class="hb">WMS BRGM</span>
   </div>
-  <button id="editBtn" onclick="toggleEdit()">✏️ Mode édition</button>
 </header>
 
-<div id="editHint">
-  <span>🖱️</span>
-  <span>Cliquez sur la carte pour ajouter un site · Cliquez sur un marqueur existant pour le modifier · <b>Shift+clic</b> pour supprimer rapidement</span>
-</div>
 
 <div class="main">
   <div id="map">
     <div class="map-legend">
-      <div class="lr2"><div class="ld" style="background:#22c55e"></div>Pliocène</div>
-      <div class="lr2"><div class="ld" style="background:#a3e635"></div>Miocène / Jura</div>
-      <div class="lr2"><div class="ld" style="background:#84cc16"></div>Fossiles Méso. ≤30min</div>
-      <div class="lr2"><div class="ld" style="background:#f59e0b"></div>Mines ≤30 min</div>
-      <div class="lr2"><div class="ld" style="background:#ec4899"></div>Volcanique</div>
+      <div class="lr2"><div class="ld" style="background:#22c55e"></div>🐚 Fossiles</div>
+      <div class="lr2"><div class="ld" style="background:#f59e0b"></div>⛏️ Minéraux / Mines</div>
+      <div class="lr2"><div class="ld" style="background:#ec4899"></div>🌋 Volcaniques</div>
       <div class="lsep"></div>
-      <div class="lr2"><div class="ld" style="background:#3b82f6"></div>Fossiles ≤1h30</div>
-      <div class="lr2"><div class="ld" style="background:#a855f7"></div>Mines ≤1h30</div>
-      <div class="lr2"><div class="ld" style="background:#56ccf2;border:1px dashed #2d4a5a"></div>Sites personnalisés</div>
+      <div class="lr2"><div class="ld" style="background:#56ccf2;border:1px dashed #2d4a5a"></div>📍 Mes sites</div>
     </div>
-    <div id="addZoneBar">Dessinez la zone en cliquant les sommets · Double-clic pour terminer</div>
     <div id="editSpinner"><div class="spin"></div>Interrogation BRGM…</div>
   </div>
 
   <div class="panel">
     <div class="tabs">
       <div class="tab active" onclick="sT('layers')">🗺️ Couches</div>
-      <div class="tab" onclick="sT('plio')">🐚 Cénoz.</div>
-      <div class="tab" onclick="sT('meso')">🐙 Méso.</div>
-      <div class="tab" onclick="sT('mines')">⛏️ Mines</div>
-      <div class="tab" onclick="sT('custom')">📍 Mes sites</div>
+      <div class="tab" onclick="sT('fossils')">🐚 Fossiles</div>
+      <div class="tab" onclick="sT('minerals')">⛏️ Minéraux</div>
       <div class="tab" onclick="sT('contribute')">📤 Proposer</div>
-      <div class="tab" onclick="sT('legend')">📖 Légende</div>
     </div>
 
     <!-- COUCHES -->
@@ -272,64 +259,47 @@ header{background:linear-gradient(135deg,#1a1005,#0d2a1a);padding:7px 14px;displ
       <div class="lc"><h4>Géologie BRGM <span style="font-size:.55rem;color:#557;font-weight:400">(geoservices.brgm.fr/geologie)</span></h4>
         <div class="lr"><button class="tog on" id="btn-brgm" onclick="tl('brgm')"></button><label onclick="tl('brgm')">Unités géologiques <span style="color:#557;font-size:.57rem">(BD-CHARM-50, 1:50 000)</span></label><input type="range" min="0" max="100" value="55" oninput="sO('brgm',this.value)"><span id="sp-brgm">55%</span></div>
         <div class="lr"><button class="tog" id="btn-litho" onclick="tl('litho')"></button><label onclick="tl('litho')">Lithologie simplifiée <span style="color:#557;font-size:.57rem">(1:1 000 000)</span></label><input type="range" min="0" max="100" value="60" oninput="sO('litho',this.value)"><span id="sp-litho">60%</span></div>
-        <div class="lr"><button class="tog" id="btn-fault" onclick="tl('fault')"></button><label onclick="tl('fault')">Scan géologique <span style="color:#557;font-size:.57rem">(1:50 000 · failles · zoom ≥11)</span></label></div>
         <div class="lr"><button class="tog" id="btn-struct" onclick="tl('struct')"></button><label onclick="tl('struct')">Carte harmonisée <span style="color:#557;font-size:.57rem">(1:50 000 · zoom ≥10)</span></label></div>
       </div>
       <div class="lc"><h4>Marqueurs</h4>
-        <div class="lr"><button class="tog on" id="btn-mp" onclick="tM('p')"></button><label><span style="color:#22c55e">●</span> Pliocène</label></div>
-        <div class="lr"><button class="tog on" id="btn-mmi" onclick="tM('mi')"></button><label><span style="color:#a3e635">●</span> Miocène / Courmettes</label></div>
-        <div class="lr"><button class="tog on" id="btn-mf30" onclick="tM('f30')"></button><label><span style="color:#84cc16">●</span> Fossiles Méso. ≤30 min</label></div>
-        <div class="lr"><button class="tog on" id="btn-mf90" onclick="tM('f90')"></button><label><span style="color:#3b82f6">●</span> Fossiles Méso. ≤1h30</label></div>
-        <div class="lr"><button class="tog on" id="btn-mm30" onclick="tM('m30')"></button><label><span style="color:#f59e0b">●</span> Mines ≤30 min</label></div>
-        <div class="lr"><button class="tog on" id="btn-mm90" onclick="tM('m90')"></button><label><span style="color:#a855f7">●</span> Mines ≤1h30</label></div>
+        <div class="lr"><button class="tog on" id="btn-mfossils" onclick="tMGroup('fossils')"></button><label><span style="color:#22c55e">●</span> Fossiles</label></div>
+        <div class="lr"><button class="tog on" id="btn-mminerals" onclick="tMGroup('minerals')"></button><label><span style="color:#f59e0b">●</span> Minéraux / Mines</label></div>
         <div class="lr"><button class="tog on" id="btn-mvol" onclick="tM('vol')"></button><label><span style="color:#ec4899">●</span> Volcaniques</label></div>
-        <div class="lr"><button class="tog on" id="btn-mcustom" onclick="tM('custom')"></button><label><span style="color:#56ccf2">●</span> Sites personnalisés</label></div>
-        <div class="lr"><button class="tog on" id="btn-mz" onclick="tM('z')"></button><label>Zones géologiques</label></div>
+        <div class="lr"><button class="tog on" id="btn-mcustom" onclick="tM('custom')"></button><label><span style="color:#56ccf2">●</span> Mes sites</label></div>
       </div>
       <div class="ibox">💡 <b>26+ sites</b> · Sources : Mindat (IDs 6914/55448/1672/32050/251822), GéositesAlpesAzur, CEN-PACA, BRGM, Bolle O. (2008/2009). Coordonnées GPS validées dont Roua : 44.03037°N 6.86773°E.</div>
     </div>
 
-    <!-- CENOZOIQUE -->
-    <div class="tc" id="tc-plio">
+    <!-- FOSSILES (Pliocène + Miocène + Mésozoïque) -->
+    <div class="tc" id="tc-fossils">
       <div class="rib">
-        <button class="rs r30s" onclick="fF('plio',30)">≤ 30 min</button>
-        <button class="rs r90s" onclick="fF('plio',90)">≤ 1h30</button>
-        <button class="rs ralls" onclick="fF('plio',0)">Tout</button>
+        <button class="rs r30s" onclick="fF('fossils',30)">≤ 30 min</button>
+        <button class="rs r90s" onclick="fF('fossils',90)">≤ 1h30</button>
+        <button class="rs ralls" onclick="fF('fossils',0)">Tout</button>
       </div>
-      <!-- cards générées dynamiquement -->
-      <div id="list-plio"></div>
+      <div id="list-fossils"></div>
     </div>
 
-    <!-- MESOZOIQUE -->
-    <div class="tc" id="tc-meso">
+    <!-- MINÉRAUX (Mines + Volcaniques) -->
+    <div class="tc" id="tc-minerals">
       <div class="rib">
-        <button class="rs r30s" onclick="fF('meso',30)">≤ 30 min</button>
-        <button class="rs r90s" onclick="fF('meso',90)">≤ 1h30</button>
-        <button class="rs ralls" onclick="fF('meso',0)">Tout</button>
+        <button class="rs r30s" onclick="fF('minerals',30)">≤ 30 min</button>
+        <button class="rs r90s" onclick="fF('minerals',90)">≤ 1h30</button>
+        <button class="rs ralls" onclick="fF('minerals',0)">Tout</button>
       </div>
-      <div id="list-meso"></div>
+      <div id="list-minerals"></div>
     </div>
 
-    <!-- MINES -->
-    <div class="tc" id="tc-mines">
-      <div class="rib">
-        <button class="rs r30s" onclick="fF('mines',30)">≤ 30 min</button>
-        <button class="rs r90s" onclick="fF('mines',90)">≤ 1h30</button>
-        <button class="rs ralls" onclick="fF('mines',0)">Tout</button>
-      </div>
-      <div id="list-mines"></div>
-    </div>
-
-    <!-- MES SITES (custom) -->
+    <!-- MES SITES (custom — accessible via sT('custom') ou mode édition) -->
     <div class="tc" id="tc-custom">
-      <div class="ibox">📍 Sites ajoutés par vous. Sauvegardés dans le navigateur (localStorage). Utilisez Import/Export JSON pour sauvegarder ou partager vos données.</div>
+      <div class="ibox">📍 Sites personnels. Sauvegardés dans le navigateur.</div>
       <div class="io-bar">
         <button class="io-btn" style="border-color:#b8903e;color:#b8903e" onclick="exportJSON()">⬇️ Exporter JSON</button>
         <button class="io-btn" style="border-color:#56ccf2;color:#56ccf2" onclick="document.getElementById('importFile').click()">⬆️ Importer JSON</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
         <button class="io-btn" style="border-color:#eb5757;color:#eb5757" onclick="confirmClearCustom()">🗑️ Tout effacer</button>
       </div>
-      <div id="list-custom"><div class="ibox" style="color:#555;text-align:center">Aucun site personnalisé.<br>Activez le mode édition ✏️ puis cliquez sur la carte.</div></div>
+      <div id="list-custom"><div class="ibox" style="color:#555;text-align:center">Aucun site personnalisé.</div></div>
     </div>
 
     <!-- CONTRIBUER -->
@@ -382,13 +352,9 @@ header{background:linear-gradient(135deg,#1a1005,#0d2a1a);padding:7px 14px;displ
 </div><!-- /main -->
 
 <script>
-// Injection du tab légende dans le panel après chargement DOM
+// Légende supprimée — colonne stratigraphique et réglementation disponibles en tc-layers
 (function(){
-  const panel=document.querySelector('.panel');
-  const legend=document.createElement('div');
-  legend.className='tc';
-  legend.id='tc-legend';
-  legend.innerHTML=`
+  const noop=`
 <style>
 .leg-section{margin-bottom:10px}
 .leg-h{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#b8903e;padding:5px 0 4px;border-bottom:1px solid #2a2a3e;margin-bottom:6px}
@@ -679,7 +645,7 @@ header{background:linear-gradient(135deg,#1a1005,#0d2a1a);padding:7px 14px;displ
   <div style="font-size:.59rem;color:#446;margin-top:5px;line-height:1.5">Toutes les coordonnées GPS sont extraites directement de Mindat.org ou de la carte BRGM/Infoterre et validées sur Google Earth. La précision est de ±10–50 m selon la source. Roua : 44.03037°N 6.86773°E (source : Mindat ID 6914, cadre coordonnées).</div>
 </div>
   `;
-  panel.appendChild(legend);
+  // legend tab removed — content available in Couches tab
 })();
 </script>
 
@@ -812,8 +778,8 @@ const BASE_SITES = [
 ];
 
 // ─── CONFIG ────────────────────────────────────────────────────────────────────
-const C={p:'#22c55e',mi:'#a3e635',f30:'#84cc16',f90:'#3b82f6',m30:'#f59e0b',m90:'#a855f7',vol:'#ec4899',custom:'#56ccf2'};
-const TABS_FOR_TYPE={p:'plio',mi:'plio',f30:'meso',f90:'meso',m30:'mines',m90:'mines',vol:'mines',custom:'custom'};
+const C={p:'#22c55e',mi:'#22c55e',f30:'#22c55e',f90:'#22c55e',m30:'#f59e0b',m90:'#f59e0b',vol:'#ec4899',custom:'#56ccf2'};
+const TABS_FOR_TYPE={p:'fossils',mi:'fossils',f30:'fossils',f90:'fossils',m30:'minerals',m90:'minerals',vol:'minerals',custom:'custom'};
 
 let editMode=false;
 let currentEditId=null;
@@ -852,28 +818,9 @@ let brgmErrShown=false;
   });
 });
 
-const grps={p:L.layerGroup(),mi:L.layerGroup(),f30:L.layerGroup(),f90:L.layerGroup(),m30:L.layerGroup(),m90:L.layerGroup(),vol:L.layerGroup(),z:L.layerGroup(),custom:L.layerGroup()};
+const grps={p:L.layerGroup(),mi:L.layerGroup(),f30:L.layerGroup(),f90:L.layerGroup(),m30:L.layerGroup(),m90:L.layerGroup(),vol:L.layerGroup(),custom:L.layerGroup()};
 Object.values(grps).forEach(g=>g.addTo(map));
 
-// ZONES GÉOLOGIQUES
-[
-  {c:[[43.62,7.04],[43.76,7.26],[43.73,7.30],[43.60,7.06]],col:'#22c55e',n:'Bassin pliocène du Var',d:'SMV (Zancléen basal) — Cagnes (Zancléen sommital) — Nice (Plaisancien). 150+ espèces. O. Bolle.'},
-  {c:[[43.69,6.97],[43.74,7.12],[43.71,7.15],[43.67,7.00]],col:'#a3e635',n:'Tourrettes-sur-Loup — Miocène + Jura',d:'Mollasse à Pectens Burdigalien (Lauves ENS). Courmettes (Jura–Crétacé). GéositesAlpesAzur.'},
-  {c:[[43.83,7.05],[43.93,7.28],[43.82,7.30],[43.77,7.10]],col:'#3b82f6',n:'Zone oxfordienne transitionnelle',d:'Oxfordien moyen — Perisphinctes, Euaspidoceras, bélemnites. D6202.'},
-  {c:[[43.75,7.28],[43.87,7.42],[43.87,7.38],[43.77,7.28]],col:'#ef4444',n:'Crétacé inférieur (Col de Braus)',d:'1200 m coupe Jura–Crétacé. Patrimoine géologique mondial.'},
-  {c:[[43.86,7.30],[43.93,7.38],[43.88,7.30]],col:'#f59e0b',n:'Filons arsenicaux Duranus–Lucéram',d:'Duranusite (loc-1672). Talmessite (Lucéram). Cénomanien basal.'},
-  {c:[[44.00,6.80],[44.08,6.93],[44.06,6.88],[43.99,6.82]],col:'#f59e0b',n:'Mines de Roua (ID 6914) + Léouvé',d:'44.03037°N 6.86773°E. Cuivre natif protohistorique. 9 espèces. Lambert X=961.22, Y=203.76.'},
-  {c:[[43.90,6.20],[43.99,6.42],[44.02,6.50],[43.94,6.25]],col:'#22c55e',n:'Arc Castellane / RNGHP',d:'Stratotype Barrémien 1862. Peyroules Hauterivien (O. Bolle 2009). Site Siréniens Éocène.'},
-  {c:[[43.53,6.75],[43.62,6.88],[43.64,6.79],[43.55,6.68]],col:'#a855f7',n:'Fontsante (Tanneron) — Fluorite',d:'20 filons CaF₂. Proustite. Référence mondiale. Mindat loc-32050.'},
-].forEach(z=>{
-  const p=L.polygon(z.c,{color:z.col,weight:1.2,dashArray:'6 4',fillColor:z.col,fillOpacity:.07});
-  p.bindPopup(`<div class="pt">${z.n}</div><div class="pb">${z.d}</div>`);
-  grps.z.addLayer(p);
-});
-
-// Cercles de rayon
-L.circle([43.710,7.262],{radius:28000,color:'#22c55e',weight:1.2,dashArray:'8 5',fillOpacity:.025,fillColor:'#22c55e'}).addTo(map);
-L.circle([43.710,7.262],{radius:85000,color:'#f2994a',weight:1,dashArray:'8 5',fillOpacity:.012,fillColor:'#f2994a'}).addTo(map);
 
 // ─── NORMALISATION SCHÉMA ─────────────────────────────────────────────────────
 // Convertit le nouveau schéma JSON (catalogue API) vers le format interne utilisé par addMarker/cardHTML
@@ -947,22 +894,7 @@ function addMarker(s, isCustom=false){
     if(editMode && !m._justDragged){
       openEditModal(s.id, e.latlng);
     } else if(!editMode) {
-      const tags=(s.tl||[]).map(t=>`<span class="tag tf">${t}</span>`).join('');
-      const sp=s.species?`<div style="font-size:.63rem;color:#f0a828;margin-top:4px">${formatSpeciesPopup(s.species)}</div>`:'';
-      const src=s.src?`<div class="src">${s.src}</div>`:'';
-      const notes=s.notes?`<div style="font-size:.62rem;color:#76b;margin-top:4px;border-top:1px dashed #2a2a3e;padding-top:4px">🔒 ${s.notes}</div>`:'';
-      const editBtnHtml = isCustom?`<button class="ppop-btn ppop-edit" onclick="openEditModal('${s.id}')">✏️ Modifier</button><button class="ppop-btn ppop-del" onclick="deleteSiteFromMap('${s.id}')">🗑️</button>`:'';
-      m.bindPopup(`
-        <div class="pt">${emoji} ${s.n}</div>
-        <div class="pb"><b style="color:#b8903e">${s.a}</b><br>${s.d}</div>
-        ${tags}<br>${sp}
-        ${src}${notes}
-        <div class="pc">${s.lat.toFixed(5)}°N ${s.lng.toFixed(5)}°E</div>
-        <div class="ppop-btns">
-          <button class="ppop-btn ppop-tab" onclick="focusTab('${s.id}')">Détail →</button>
-          ${editBtnHtml}
-        </div>
-      `,{maxWidth:270}).openPopup();
+      highlightCard(s.id);
     }
     m._justDragged=false;
   });
@@ -992,9 +924,8 @@ function saveCustomSites(arr){
 let customSites = loadCustomSites();
 
 function renderAllLists(){
-  renderList('plio', ['p','mi']);
-  renderList('meso', ['f30','f90']);
-  renderList('mines', ['m30','m90','vol']);
+  renderList('fossils', ['p','mi','f30','f90']);
+  renderList('minerals', ['m30','m90','vol']);
   renderCustomList();
   updateCounter();
 }
@@ -1360,19 +1291,26 @@ function focusSite(id){
   const s=catalogueSites.find(x=>x.id===id)||customSites.find(x=>x.id===id);
   if(!s) return;
   map.flyTo([s.lat,s.lng],14,{duration:1.2});
-  setTimeout(()=>MKS[id]?.openPopup(),1300);
+  highlightCard(id);
 }
 
-function focusTab(id){
+function highlightCard(id){
   const s=catalogueSites.find(x=>x.id===id)||customSites.find(x=>x.id===id);
   if(!s) return;
   const tab=TABS_FOR_TYPE[s.t]||'custom';
   sT(tab);
   setTimeout(()=>{
     const el=document.querySelector(`[data-id="${id}"]`);
-    if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
+    if(el){
+      el.scrollIntoView({behavior:'smooth',block:'nearest'});
+      el.style.borderColor='#b8903e';
+      el.style.background='#1e1e30';
+      setTimeout(()=>{ el.style.borderColor=''; el.style.background=''; },1800);
+    }
   },150);
 }
+
+function focusTab(id){ highlightCard(id); }
 
 function fF(tab, r){
   document.querySelectorAll(`#list-${tab} .card`).forEach(c=>{
@@ -1389,15 +1327,28 @@ function tl(id){
   lSt[id]?(!map.hasLayer(layers[id])&&map.addLayer(layers[id])):(map.hasLayer(layers[id])&&map.removeLayer(layers[id]));
 }
 function sO(id,v){layers[id].setOpacity(v/100);document.getElementById('sp-'+id).textContent=v+'%';}
-const mSt={p:true,mi:true,f30:true,f90:true,m30:true,m90:true,vol:true,z:true,custom:true};
+const mSt={p:true,mi:true,f30:true,f90:true,m30:true,m90:true,vol:true,custom:true};
 function tM(t){
   mSt[t]=!mSt[t];
   document.getElementById('btn-m'+t).classList.toggle('on',mSt[t]);
   mSt[t]?(!map.hasLayer(grps[t])&&map.addLayer(grps[t])):(map.hasLayer(grps[t])&&map.removeLayer(grps[t]));
 }
+function tMGroup(group){
+  const fossilTypes=['p','mi','f30','f90'];
+  const mineralTypes=['m30','m90'];
+  const types=group==='fossils'?fossilTypes:mineralTypes;
+  const btn=document.getElementById('btn-m'+group);
+  const anyOn=types.some(t=>mSt[t]);
+  const newState=!anyOn;
+  types.forEach(t=>{
+    mSt[t]=newState;
+    newState?(!map.hasLayer(grps[t])&&map.addLayer(grps[t])):(map.hasLayer(grps[t])&&map.removeLayer(grps[t]));
+  });
+  btn.classList.toggle('on',newState);
+}
 function sT(n){
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    const ns=['layers','plio','meso','mines','custom','contribute','legend'];
+    const ns=['layers','fossils','minerals','contribute'];
     t.classList.toggle('active',ns[i]===n);
   });
   document.querySelectorAll('.tc').forEach(c=>c.classList.toggle('active',c.id==='tc-'+n));
@@ -1537,7 +1488,7 @@ function updateNoticeLinks(sheet, unitCode){
   const el=document.getElementById('noticeLinksPanel');
   if(!el)return;
   if(!sheet){el.innerHTML='<span style="color:#555">Feuille non détectée — vérifier les coordonnées</span>';return;}
-  const pdfUrl=`http://ficheinfoterre.brgm.fr/Notices/${sheet.code}N.pdf`;
+  const pdfUrl=`https://ficheinfoterre.brgm.fr/Notices/${sheet.code}N.pdf`;
   const ficheUrl=`https://infoterre.brgm.fr/viewer/MainTileForward.do?rub=30`;
   const unitTxt=unitCode?` | Unité : <b style="color:#f0a828">${unitCode}</b>`:' | (activez la couche géologique et cliquez pour détecter l\'unité)';
   el.innerHTML=`

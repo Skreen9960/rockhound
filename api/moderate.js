@@ -44,9 +44,31 @@ export default async function handler(req, res) {
     return res.status(403).send(page('Accès refusé', 'Token invalide ou expiré.', '#eb5757'));
   }
 
-  if (!id || !['validate', 'reject'].includes(action)) {
+  if (!id || !['validate', 'reject', 'delete'].includes(action)) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(400).send(page('Erreur', 'Paramètres manquants (id, action).', '#f59e0b'));
+  }
+
+  // DELETE : supprime depuis pending OU catalogue
+  if (action === 'delete') {
+    const catalogue = await readBlob('catalogue.json', 'catalogue.json');
+    const catIdx = catalogue.findIndex(s => s.id === id);
+    if (catIdx !== -1) {
+      const [site] = catalogue.splice(catIdx, 1);
+      await writeBlob('catalogue.json', catalogue);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send(page('🗑️ Site supprimé', `"${site.name}" a été supprimé du catalogue.`, '#6b7280'));
+    }
+    const pending2 = await readBlob('pending.json', 'pending.json');
+    const pendIdx = pending2.findIndex(s => s.id === id);
+    if (pendIdx !== -1) {
+      const [site] = pending2.splice(pendIdx, 1);
+      await writeBlob('pending.json', pending2);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send(page('🗑️ Site supprimé', `"${site.name}" a été supprimé des soumissions en attente.`, '#6b7280'));
+    }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(404).send(page('Introuvable', 'Ce site n\'existe pas ou a déjà été supprimé.', '#f59e0b'));
   }
 
   const pending = await readBlob('pending.json', 'pending.json');
