@@ -752,7 +752,7 @@ header{background:linear-gradient(135deg,#1a1005,#0d2a1a);padding:7px 14px;displ
   <div class="modal" id="detailModal" style="max-width:500px">
     <div id="detailContent"></div>
     <div class="modal-footer" style="margin-top:14px">
-      <button class="btn btn-secondary" onclick="document.getElementById('detailOverlay').classList.remove('open')">Fermer</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('detailOverlay').classList.remove('open');document.getElementById('detailFlyBtn').style.display=''">Fermer</button>
       <button class="btn btn-primary" id="detailFlyBtn" onclick="detailFly()">📍 Voir sur la carte</button>
     </div>
   </div>
@@ -1055,20 +1055,61 @@ map.on('click', async function(e){
 });
 
 function showGeologyPopup(latlng, info){
-  let content;
-  if(!info){
-    content=`<div class="pt">🌍 Identification BRGM</div><div class="pb" style="color:#eb5757">Données géologiques BRGM temporairement indisponibles.</div>`;
-  } else if(!info.age && !info.unitCode){
-    const s=info.sheet;
-    content=`<div class="pt">🌍 ${s?s.name:'Hors zone PACA'}</div><div class="pb" style="color:#888">Pas de données BRGM pour ce point.</div>`;
+  showGeoModal(latlng, info);
+}
+
+function showGeoModal(latlng, info){
+  // Masque le bouton "Voir sur la carte" (non pertinent pour un clic carte)
+  document.getElementById('detailFlyBtn').style.display='none';
+
+  const sheet=info?.sheet||findSheetForCoords(latlng.lat,latlng.lng);
+  const noticeHtml=sheet
+    ?`<div class="detail-section"><h4>Notice géologique BRGM</h4>
+       <a class="detail-notice" href="https://ficheinfoterre.brgm.fr/Notices/${sheet.code}N.pdf" target="_blank">📄 Notice ${sheet.code}N — ${sheet.name}</a>
+       <div style="font-size:.6rem;color:#557;margin-top:5px">Feuille 1:50 000 · Description des formations, faune associée, historique minier.</div></div>`
+    :'';
+
+  let html;
+  if(!info||(!info.age&&!info.unitCode)){
+    html=`
+    <div class="detail-header">
+      <div class="detail-emoji">🪨</div>
+      <div>
+        <div class="detail-title">Données non disponibles</div>
+        <div class="detail-sub">🗺️ Géologie BRGM</div>
+      </div>
+    </div>
+    <div class="detail-gps">${latlng.lat.toFixed(5)}°N ${latlng.lng.toFixed(5)}°E</div>
+    <div class="detail-desc" style="color:#888;margin-bottom:12px">La couche géologique BRGM n'a pas renvoyé de données pour ce point — zone hors couverture, mer, ou lac.</div>
+    ${noticeHtml}`;
   } else {
     const emoji=info.emoji||'🪨';
-    const age=info.age||'';
-    const unit=info.unitCode?`<br><span style="color:#557;font-size:.6rem">Unité ${info.unitCode}${info.unitName?' — '+info.unitName:''}</span>`:'';
-    const sheet=info.sheet?`<br><span style="color:#557;font-size:.6rem">Feuille BRGM : ${info.sheet.name}</span>`:'';
-    content=`<div class="pt">${emoji} Géologie BRGM</div><div class="pb">${age}${unit}${sheet}</div>`;
+    const age=info.age||info.unitName||'Unité géologique';
+    const code=info.unitCode||'';
+    const sk=info.suggestionKey;
+    const db=sk&&SPECIES_DB[sk];
+    const specHtml=db?`<div class="detail-section"><h4>${['m30','m90'].includes(info.type)?'Minéraux potentiels':'Fossiles potentiels'}</h4>
+      <div style="font-size:.72rem;color:#ccc;margin-bottom:6px;font-style:italic">${db.label}</div>
+      ${db.groups.slice(0,2).map(g=>`
+        <div style="font-size:.63rem;color:#b8903e;font-weight:700;margin-top:4px">${g.g}</div>
+        <div style="font-size:.63rem;color:#bbb;font-style:italic;line-height:1.5">${g.items.slice(0,4).join(' · ')}</div>
+      `).join('')}
+    </div>`:'';
+    html=`
+    <div class="detail-header">
+      <div class="detail-emoji">${emoji}</div>
+      <div>
+        <div class="detail-title">${age}</div>
+        <div class="detail-sub">🗺️ Géologie BRGM — clic carte</div>
+      </div>
+    </div>
+    <div class="detail-gps">${latlng.lat.toFixed(5)}°N ${latlng.lng.toFixed(5)}°E</div>
+    ${code?`<div class="detail-geo">Notation BRGM : <b>${code}</b>${info.unitName&&info.unitName!==age?' — '+info.unitName:''}</div>`:''}
+    ${specHtml}
+    ${noticeHtml}`;
   }
-  L.popup().setLatLng(latlng).setContent(content).openOn(map);
+  document.getElementById('detailContent').innerHTML=html;
+  document.getElementById('detailOverlay').classList.add('open');
 }
 
 // ─── MODAL ────────────────────────────────────────────────────────────────────
@@ -1309,6 +1350,8 @@ function focusSite(id){
 
 let _detailId=null;
 function showSiteDetail(id){
+  // Assure que le bouton "Voir sur la carte" est visible pour les sites
+  document.getElementById('detailFlyBtn').style.display='';
   const s=catalogueSites.find(x=>x.id===id)||customSites.find(x=>x.id===id);
   if(!s) return;
   _detailId=id;
@@ -1357,8 +1400,10 @@ function showSiteDetail(id){
 }
 
 function closeDetailOutside(e){
-  if(e.target===document.getElementById('detailOverlay'))
+  if(e.target===document.getElementById('detailOverlay')){
     document.getElementById('detailOverlay').classList.remove('open');
+    document.getElementById('detailFlyBtn').style.display='';
+  }
 }
 
 function detailFly(){

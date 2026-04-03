@@ -51,7 +51,38 @@ export default async function handler(req, res) {
   const lngN = parseFloat(lng);
   if (isNaN(latN) || isNaN(lngN)) return res.status(400).json({ ok: false, error: 'Coordonnées invalides.' });
 
-  // EPSG:4326 + text/html : format éprouvé avec geoservices.brgm.fr
+  // ─── Tentative WFS data.geopf.fr (IGN/BRGM) ───────────────────────────────
+  // Plus fiable que GetFeatureInfo WMS car la couche GEOLOGIE n'est pas toujours queryable.
+  const wfsBboxD = 0.003;
+  const wfsBbox = `${lngN - wfsBboxD},${latN - wfsBboxD},${lngN + wfsBboxD},${latN + wfsBboxD}`;
+  const WFS_LAYERS = ['GEOLOGIE:BDGSF_1M_GEO', 'GEOLOGIE:SURFACE_LITHO', 'GEOLOGIE:GEO1M'];
+  for (const layer of WFS_LAYERS) {
+    try {
+      const wfsUrl = `https://data.geopf.fr/wfs/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature`
+        + `&TYPENAMES=${encodeURIComponent(layer)}&OUTPUTFORMAT=application%2Fjson`
+        + `&BBOX=${wfsBbox},EPSG:4326&COUNT=1`;
+      const wfsR = await fetch(wfsUrl, { signal: AbortSignal.timeout(6000) });
+      if (!wfsR.ok) continue;
+      const ct = wfsR.headers.get('content-type') || '';
+      if (!ct.includes('json')) continue;
+      const gj = await wfsR.json();
+      if (!gj?.features?.length) continue;
+      const p = gj.features[0].properties || {};
+      const notation = p.NOTATION || p.notation || p.CODE || p.code || p.LEGENDE_CODE || '';
+      const description = p.DESCRIPTION || p.description || p.LIBELLE || p.libelle
+        || p.LEGENDE || p.legende || p.NOM || p.nom || '';
+      if (!notation && !description) continue;
+      return res.status(200).json({
+        ok: true,
+        data: {
+          type: 'FeatureCollection',
+          features: [{ type: 'Feature', properties: { NOTATION: notation, DESCRIPTION: description, NOM_CARTE: '' } }],
+        },
+      });
+    } catch { /* essai suivant */ }
+  }
+
+  // ─── Fallback : WMS GetFeatureInfo BRGM ───────────────────────────────────
   const d = 0.005;
   const bbox = `${latN - d},${lngN - d},${latN + d},${lngN + d}`;
   const url =
