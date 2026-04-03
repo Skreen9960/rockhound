@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   try {
     const blobs = await list({ prefix: 'pending.json' });
     if (blobs.blobs.length > 0) {
-      const response = await fetch(blobs.blobs[0].url);
+      const response = await fetch(blobs.blobs[0].url, { headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` } });
       const data = await response.json();
       // Ne jamais exposer l'IP des contributeurs
       const safe = data.map(({ submittedIp, ...s }) => s);

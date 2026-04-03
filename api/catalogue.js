@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     // Cherche le blob catalogue.json
     const blobs = await list({ prefix: 'catalogue.json' });
     if (blobs.blobs.length > 0) {
-      const response = await fetch(blobs.blobs[0].url);
+      const response = await fetch(blobs.blobs[0].url, { headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` } });
       const data = await response.json();
       return res.status(200).json({ ok: true, data });
     }

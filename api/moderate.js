@@ -6,7 +6,7 @@ async function readBlob(prefix, fallbackFile) {
   try {
     const blobs = await list({ prefix });
     if (blobs.blobs.length > 0) {
-      const r = await fetch(blobs.blobs[0].url);
+      const r = await fetch(blobs.blobs[0].url, { headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` } });
       return await r.json();
     }
   } catch (e) {}
@@ -22,7 +22,7 @@ async function writeBlob(filename, data) {
   for (const blob of blobs.blobs) {
     await del(blob.url);
   }
-  await put(filename, JSON.stringify(data), { access: 'public', contentType: 'application/json' });
+  await put(filename, JSON.stringify(data), { access: 'private', contentType: 'application/json' });
 }
 
 function page(title, msg, color) {
