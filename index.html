@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RockHound — Prospection PACA</title>
+<meta name="description" content="RockHound — Carte interactive de prospection fossiles et minéraux en région PACA. Couches géologiques BRGM, 24+ sites géoréférencés, identification géologique au clic.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://rockhound-lac.vercel.app/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://rockhound-lac.vercel.app/">
+<meta property="og:title" content="RockHound — Prospection PACA">
+<meta property="og:description" content="Carte interactive pour prospecteurs de fossiles et minéraux en PACA. Couches BRGM, IGN, 24+ sites géoréférencés avec fiches détaillées, identification géologique au clic.">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RockHound — Prospection PACA">
+<meta name="twitter:description" content="Carte interactive fossiles & minéraux PACA — BRGM, IGN, 24+ sites, identification géologique au clic.">`
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
@@ -160,6 +171,50 @@ header{background:linear-gradient(135deg,#1a1005,#0d2a1a);padding:7px 14px;displ
 </style>
 </head>
 <body>
+<noscript>
+  <div style="font-family:sans-serif;max-width:700px;margin:40px auto;padding:20px;line-height:1.7">
+    <h1>🪨 RockHound — Prospection PACA</h1>
+    <p>Carte interactive de prospection de fossiles et minéraux en région PACA (Provence-Alpes-Côte d'Azur). Couches géologiques BRGM, fond IGN, 24+ sites géoréférencés avec fiches détaillées, identification géologique au clic.</p>
+    <h2>Sites disponibles</h2>
+    <h3>🐚 Cénozoïque (Pliocène / Miocène)</h3>
+    <ul>
+      <li>Argilières Saint-Martin-du-Var — Zancléen basal, 200–300 coquilles/demi-journée</li>
+      <li>Argilières Cagnes-sur-Mer — Zancléen sommital, gastéropodes thermophiles</li>
+      <li>Ancienne carrière Nice — Plaisancien, 450 coquilles en 2 sorties</li>
+      <li>Lauves (Tourrettes-sur-Loup) — Burdigalien, Pecten et Clypeaster (ENS)</li>
+      <li>Gîte fossilifère des Courmettes — Jurassique–Crétacé</li>
+    </ul>
+    <h3>🐙 Fossiles Mésozoïques</h3>
+    <ul>
+      <li>Col de Braus — Coupe 1 200 m Jura–Crétacé, ammonites hétéromorphes</li>
+      <li>Pont-de-Peille / Fontanil — Albien, Mariella, Stoliczkaia</li>
+      <li>D6202 — Marnes oxfordiennes, Perisphinctes, Euaspidoceras</li>
+      <li>Gorges Vésubie D2565 — Callovien–Oxfordien, bélemnites</li>
+      <li>Peyroules — Hauterivien, Duvalia gr. dilatata</li>
+      <li>Barrême — Stratotype Barrémien 1862 (RNGHP)</li>
+      <li>Arc de Castellane / Senez — Jura–Crétacé (RNGHP)</li>
+      <li>Saint-Auban / Logis du Pin — Jurassique, ammonites, oursins</li>
+      <li>Site des Siréniens (Col des Lèques) — Éocène, Halitherium (RNGHP)</li>
+    </ul>
+    <h3>⛏️ Mines et Minéraux</h3>
+    <ul>
+      <li>Mine de l'Éguisse (Duranus) — Duranusite, réalgar, orpiment</li>
+      <li>Lucéram — Talmessite (1ère France), orpiment</li>
+      <li>Gypse triasique Col de Brouis / Sospel — gypse sélénite, anhydrite</li>
+      <li>Mines de Roua (Gorges de Daluis) — Cu natif protohistorique, RNR</li>
+      <li>Mine de Léouvé — azurite, malachite, musée du cuivre</li>
+      <li>Mine de Vallauria (Tende) — Pb-Zn-Ag, visite guidée</li>
+      <li>Vallon de Merlier (Isola) — ménéghinite (1ère France), galène</li>
+      <li>Mine de Fontsante (Tanneron) — fluorite multicolore, proustite</li>
+    </ul>
+    <h3>🌋 Sites Volcaniques</h3>
+    <ul>
+      <li>Andésites oligocènes Biot/VL — labradorite, pyroxènes</li>
+      <li>Volcan de Maure-Vieil (Mandelieu) — méga-caldeira éteinte</li>
+    </ul>
+    <p><em>JavaScript est nécessaire pour accéder à la carte interactive complète.</em></p>
+  </div>
+</noscript>
 
 <header>
   <div class="htitle">
@@ -1254,7 +1309,7 @@ function exportJSON(){
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='geo_nice_mes_sites_'+new Date().toISOString().slice(0,10)+'.json';
+  a.download='rockhound-sites-perso-'+new Date().toISOString().slice(0,10)+'.json';
   a.click();
 }
 
@@ -1302,14 +1357,14 @@ function confirmClearCustom(){
 
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
 function focusSite(id){
-  const s=BASE_SITES.find(x=>x.id===id)||customSites.find(x=>x.id===id);
+  const s=catalogueSites.find(x=>x.id===id)||customSites.find(x=>x.id===id);
   if(!s) return;
   map.flyTo([s.lat,s.lng],14,{duration:1.2});
   setTimeout(()=>MKS[id]?.openPopup(),1300);
 }
 
 function focusTab(id){
-  const s=BASE_SITES.find(x=>x.id===id)||customSites.find(x=>x.id===id);
+  const s=catalogueSites.find(x=>x.id===id)||customSites.find(x=>x.id===id);
   if(!s) return;
   const tab=TABS_FOR_TYPE[s.t]||'custom';
   sT(tab);

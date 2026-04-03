@@ -42,7 +42,29 @@ Travail de planification complet avec BMad :
 
 ---
 
-## Session 2026-04-03
+## Session 2026-04-03 (suite — Thomas absent, Claude en autonomie)
+
+### Épopées complétées aujourd'hui
+- ✅ Épopée 1 : Setup GitHub + Vercel + 4 variables d'env
+- ✅ Épopée 2 : Proxy BRGM + identification géologique au clic + dégradation gracieuse
+- ✅ Épopée 3 : catalogue.json 24 sites + avertissements toxicité/zones protégées
+- ✅ Épopée 4 : Contributions communautaires (formulaire + email Resend + modération)
+- ✅ Épopée 5 : Éditeur personnel (brownfield, validé + corrections focusSite/export)
+- ✅ Épopée 6 : SEO (meta tags, Open Graph, noscript crawlers)
+
+### État final
+**TOUTES LES ÉPOPÉES TERMINÉES**. RockHound est en production.
+URL : https://rockhound-lac.vercel.app
+
+### Prochaine session
+- Tester l'envoi d'une contribution (onglet 📤 Proposer)
+- Vérifier réception email thomas.m06@hotmail.fr
+- Tester les liens valider/rejeter dans l'email
+- Optionnel : ajouter une image OG pour les meta tags (og:image)
+
+---
+
+## Session 2026-04-03 (début)
 
 ### Où on en est
 - Planification 100% terminée
