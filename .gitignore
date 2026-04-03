@@ -19,3 +19,5 @@ Thumbs.db
 *.swp
 
 .vercel
+.env*.local
+Notices/1024N.pdf

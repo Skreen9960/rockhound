@@ -1026,6 +1026,42 @@ function toggleEdit(){
   if(!editMode) showToast('Mode édition désactivé · Toutes les positions sont sauvegardées','#22c55e');
 }
 
+// ─── GeoJSON polygones géologiques (BD-CHARM-50 dept 06) ─────────────────────
+let _geoFeats=null, _geoBboxes=null, _geoPromise=null;
+
+function loadGeoJson(){
+  if(_geoFeats) return Promise.resolve(true);
+  if(_geoPromise) return _geoPromise;
+  _geoPromise=fetch('/data/geologie-06.geojson')
+    .then(r=>{if(!r.ok)throw 0;return r.json();})
+    .then(data=>{
+      _geoFeats=data.features;
+      _geoBboxes=_geoFeats.map(f=>{
+        let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+        const rings=f.geometry.type==='MultiPolygon'?f.geometry.coordinates.flat():f.geometry.coordinates;
+        for(const ring of rings) for(const [x,y] of ring){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+        return[x0,y0,x1,y1];
+      });
+      return true;
+    }).catch(()=>false);
+  return _geoPromise;
+}
+function _ray(x,y,ring){let ins=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const[xi,yi]=ring[i],[xj,yj]=ring[j];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))ins=!ins;}return ins;}
+function _pip(x,y,rings){if(!_ray(x,y,rings[0]))return false;for(let i=1;i<rings.length;i++)if(_ray(x,y,rings[i]))return false;return true;}
+function findPolygonUnit(lat,lng){
+  if(!_geoFeats)return null;
+  for(let i=0;i<_geoFeats.length;i++){
+    const[x0,y0,x1,y1]=_geoBboxes[i];
+    if(lng<x0||lng>x1||lat<y0||lat>y1)continue;
+    const g=_geoFeats[i].geometry;
+    const hit=g.type==='MultiPolygon'?g.coordinates.some(p=>_pip(lng,lat,p)):_pip(lng,lat,g.coordinates);
+    if(hit)return _geoFeats[i].properties;
+  }
+  return null;
+}
+// Pré-chargement silencieux après init
+setTimeout(()=>loadGeoJson(),1500);
+
 // Clic sur la carte → selon le mode actif
 map.on('click', async function(e){
   // Mode contribution : remplir les coordonnées du formulaire
@@ -1037,13 +1073,20 @@ map.on('click', async function(e){
   }
 
   if(!editMode){
-    // Affiche le modal IMMÉDIATEMENT avec les données locales (feuille BRGM)
-    // puis enrichit en arrière-plan si l'API répond
     const localInfo={sheet:findSheetForCoords(e.latlng.lat,e.latlng.lng),age:'',unitCode:null,suggestionKey:null};
     showGeoModal(e.latlng,localInfo);
-    queryBRGM(e.latlng).then(info=>{
-      if(info&&(info.age||info.unitCode)) showGeoModal(e.latlng,info);
-    }).catch(()=>{});
+    loadGeoJson().then(()=>{
+      const props=findPolygonUnit(e.latlng.lat,e.latlng.lng);
+      if(props&&(props.NOTATION||props.DESCR)){
+        const mapped=mapNotationToAge(props.NOTATION||'',props.DESCR||'');
+        showGeoModal(e.latlng,{sheet:localInfo.sheet,unitCode:props.NOTATION||null,unitName:props.DESCR||null,
+          age:mapped.age,type:mapped.type,emoji:mapped.emoji,suggestionKey:mapped.key,color:props.color});
+      } else {
+        queryBRGM(e.latlng).then(info=>{if(info&&(info.age||info.unitCode))showGeoModal(e.latlng,info);}).catch(()=>{});
+      }
+    }).catch(()=>{
+      queryBRGM(e.latlng).then(info=>{if(info&&(info.age||info.unitCode))showGeoModal(e.latlng,info);}).catch(()=>{});
+    });
     return;
   }
 
@@ -1071,7 +1114,7 @@ function showGeoModal(latlng, info){
   const sheet=info?.sheet||findSheetForCoords(latlng.lat,latlng.lng);
   const noticeHtml=sheet
     ?`<div class="detail-section"><h4>Notice géologique BRGM</h4>
-       <a class="detail-notice" href="https://infoterre.brgm.fr/notices/${sheet.code}N.pdf" target="_blank">📄 Notice ${sheet.code}N — ${sheet.name}</a>
+       <a class="detail-notice" href="/Notices/${sheet.code}.pdf" target="_blank">📄 Notice ${sheet.code}N — ${sheet.name}</a>
        <div style="font-size:.6rem;color:#557;margin-top:5px">Feuille 1:50 000 · Description des formations, faune associée, historique minier.</div></div>`
     :'';
 
@@ -1092,10 +1135,15 @@ function showGeoModal(latlng, info){
     const emoji=info.emoji||'🪨';
     const age=info.age||info.unitName||'Unité géologique';
     const code=info.unitCode||'';
+    const descr=info.unitName&&info.unitName!==age?info.unitName:'';
+    const colorChip=info.color
+      ?`<span style="display:inline-block;width:13px;height:13px;background:${info.color};border:1px solid rgba(255,255,255,.25);border-radius:2px;vertical-align:middle;margin-right:5px"></span>`
+      :'';
     const sk=info.suggestionKey;
     const db=sk&&SPECIES_DB[sk];
-    const specHtml=db?`<div class="detail-section"><h4>${['m30','m90'].includes(info.type)?'Minéraux potentiels':'Fossiles potentiels'}</h4>
-      <div style="font-size:.72rem;color:#ccc;margin-bottom:6px;font-style:italic">${db.label}</div>
+    const isMin=['m30','m90','vol'].includes(info.type);
+    const specHtml=db?`<div class="detail-section"><h4>${isMin?'Minéraux potentiels':'Fossiles potentiels'}</h4>
+      <div style="font-size:.7rem;color:#ccc;margin-bottom:6px;font-style:italic">${db.label}</div>
       ${db.groups.slice(0,2).map(g=>`
         <div style="font-size:.63rem;color:#b8903e;font-weight:700;margin-top:4px">${g.g}</div>
         <div style="font-size:.63rem;color:#bbb;font-style:italic;line-height:1.5">${g.items.slice(0,4).join(' · ')}</div>
@@ -1110,7 +1158,8 @@ function showGeoModal(latlng, info){
       </div>
     </div>
     <div class="detail-gps">${latlng.lat.toFixed(5)}°N ${latlng.lng.toFixed(5)}°E</div>
-    ${code?`<div class="detail-geo">Notation BRGM : <b>${code}</b>${info.unitName&&info.unitName!==age?' — '+info.unitName:''}</div>`:''}
+    ${code?`<div class="detail-geo">${colorChip}<b>${code}</b></div>`:''}
+    ${descr?`<div style="font-size:.74rem;color:#c8c0b0;font-style:italic;margin:5px 0 10px;line-height:1.5">${descr}</div>`:''}
     ${specHtml}
     ${noticeHtml}`;
   }
@@ -1374,7 +1423,7 @@ function showSiteDetail(id){
 
   // BRGM notice
   const sheet=findSheetForCoords(s.lat,s.lng);
-  const noticeHtml=sheet?`<div class="detail-section"><h4>Notice géologique BRGM</h4><a class="detail-notice" href="https://infoterre.brgm.fr/notices/${sheet.code}N.pdf" target="_blank">📄 Notice ${sheet.code}N — ${sheet.name}</a><div style="font-size:.6rem;color:#557;margin-top:5px">Feuille 1:50 000 · Contient la description complète des formations, faune associée, historique.</div></div>`:'';
+  const noticeHtml=sheet?`<div class="detail-section"><h4>Notice géologique BRGM</h4><a class="detail-notice" href="/Notices/${sheet.code}.pdf" target="_blank">📄 Notice ${sheet.code}N — ${sheet.name}</a><div style="font-size:.6rem;color:#557;margin-top:5px">Feuille 1:50 000 · Contient la description complète des formations, faune associée, historique.</div></div>`:'';
 
   // Warnings
   const warnings=renderSiteWarnings(s);
@@ -1614,7 +1663,7 @@ function updateNoticeLinks(sheet, unitCode){
   const el=document.getElementById('noticeLinksPanel');
   if(!el)return;
   if(!sheet){el.innerHTML='<span style="color:#555">Feuille non détectée — vérifier les coordonnées</span>';return;}
-  const pdfUrl=`https://infoterre.brgm.fr/notices/${sheet.code}N.pdf`;
+  const pdfUrl=`/Notices/${sheet.code}.pdf`;
   const ficheUrl=`https://infoterre.brgm.fr/viewer/MainTileForward.do?rub=30`;
   const unitTxt=unitCode?` | Unité : <b style="color:#f0a828">${unitCode}</b>`:' | (activez la couche géologique et cliquez pour détecter l\'unité)';
   el.innerHTML=`
