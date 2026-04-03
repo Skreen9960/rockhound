@@ -97,8 +97,9 @@ export default async function handler(req, res) {
   // Email via Resend
   const host = req.headers.host || 'rockhound-lac.vercel.app';
   const base = `https://${host}`;
-  const validateUrl = `${base}/api/moderate?id=${id}&action=validate&token=${process.env.ADMIN_TOKEN}`;
-  const rejectUrl   = `${base}/api/moderate?id=${id}&action=reject&token=${process.env.ADMIN_TOKEN}`;
+  const adminToken  = process.env.ADMIN_TOKEN?.trim();
+  const validateUrl = `${base}/api/moderate?id=${id}&action=validate&token=${adminToken}`;
+  const rejectUrl   = `${base}/api/moderate?id=${id}&action=reject&token=${adminToken}`;
 
   const specLine = site.species.length ? `<tr><td style="padding:3px 12px 3px 0;color:#888">Espèces</td><td>${site.species.join(', ')}</td></tr>` : '';
   const minLine  = site.minerals.length ? `<tr><td style="padding:3px 12px 3px 0;color:#888">Minéraux</td><td>${site.minerals.join(', ')}</td></tr>` : '';

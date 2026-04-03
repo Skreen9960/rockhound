@@ -37,8 +37,9 @@ function page(title, msg, color) {
 
 export default async function handler(req, res) {
   const { id, action, token } = req.query;
+  const adminToken = process.env.ADMIN_TOKEN?.trim();
 
-  if (!token || token !== process.env.ADMIN_TOKEN) {
+  if (!token || token !== adminToken) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(403).send(page('Accès refusé', 'Token invalide ou expiré.', '#eb5757'));
   }
